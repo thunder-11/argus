@@ -9,16 +9,16 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_0_complete`
+Overall status: `phase_1_in_progress`
 Last updated: 2026-09-12 Asia/Calcutta  
-Current objective: Phase 0 is complete; Phase 1 is ready to start.
+Current objective: Build and validate the modular backend foundation and contract test harness.
 
 ## Phase Tracker
 
 | Phase | Name | Status | Commit | Remote verification | Notes |
 | --- | --- | --- | --- | --- | --- |
 | 0 | Planning and Baseline | complete | `979864b22cdc23a49bd8b6ef9efa30e56a04a37c` | verified on `origin/sih26183/implementation` | Runtime baseline, inventory, checks, and traceability map completed. |
-| 1 | Modular Backend Foundation and Test Harness | not_started | pending | pending | Ready to start. |
+| 1 | Modular Backend Foundation and Test Harness | in_progress | pending | pending | Modularization, runtime configuration, shared contracts, and tests underway. |
 | 2 | Persistence and Durable Processing | not_started | pending | pending | Awaiting Phase 1 completion. |
 | 3 | Identity, Intake, and Case Workflow | not_started | pending | pending | Awaiting Phase 2 completion. |
 | 4 | Real Blockchain Ingestion | not_started | pending | pending | Requires provider credential placeholders and optional live API keys. |
@@ -71,6 +71,22 @@ Recorded before implementation:
 | Map acceptance/checklist requirements to phases | done | `phase_0_baseline.md` maps AC-01-AC-24, TG-01-TG-14, ML-01-ML-24, and CK-01.01-CK-12.06 to owning phases. |
 | Finalize/push Phase 0 baseline | done | Commit `979864b22cdc23a49bd8b6ef9efa30e56a04a37c` was pushed and independently verified with `git ls-remote`. |
 
+## Phase 1 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Add modular composition root | done | `backend/app/main.py` provides an application factory; `backend/main.py` preserves the existing `uvicorn main:app` entry point. |
+| Establish module boundaries | done | Added API, controllers, services, repositories, providers, analytics, jobs, integrations, security, schemas, core, middleware, and utilities packages; responsibilities and dependency direction are documented in `backend/ARCHITECTURE.md`. |
+| Validate runtime configuration | done | Typed settings reject unsafe production secrets, wildcard CORS, fixture/demo production mode, invalid modes/chains/trace limits, and missing provider credentials for enabled production chains. |
+| Isolate fixtures from live retrieval | done | Startup seeds only in explicit fixture mode; live blockchain retrieval no longer calls synthetic generation; trace requests no longer synthesize an origin wallet or guess a network. |
+| Standardize shared API behavior | done | Canonical error envelope, field errors, request/correlation IDs, structured request logging, health/readiness, provider readiness state, and shared response schemas added. |
+| Add canonical pagination compatibly | done | Case, alert, VASP, and address lists expose `items`, `total`, `page`, and `page_size` while retaining existing frontend wrapper keys. |
+| Pin current compatible dependencies | done | Runtime versions are pinned in `backend/requirements.txt`; pytest is isolated in `backend/requirements-dev.txt`. `pip check` passes. |
+| Add backend test harness | done | Pytest configuration and 21 tests cover config, errors, auth, modular boundaries, OpenAPI, redaction, runtime modes, pagination, synthetic fallback prevention, and frontend-facing read contracts. |
+| Verify OpenAPI | done | OpenAPI generates successfully with 19 paths, documented shared errors, legacy frontend paths, and new health endpoints. |
+| Verify existing frontend compatibility | done | `npm run lint` and `npm run build` exit 0; no frontend source or design changes were made. Existing lint and bundle-size warnings remain recorded. |
+| Finalize/push Phase 1 | in_progress | Pending commit and remote SHA verification. |
+
 ## Requirement Coverage Map
 
 | PRD Area | Planned Phase(s) | Status |
@@ -90,19 +106,19 @@ Recorded before implementation:
 | Alerts and notifications | 10 | not_started |
 | Reports and evidence | 11 | not_started |
 | Search, filtering, pagination, and history | 11, 12 | not_started |
-| Authentication, authorization, and security | 1, 3, 20-security coverage through all phases | not_started |
+| Authentication, authorization, and security | 1, 3, 20-security coverage through all phases | in_progress |
 | Audit logs | 3, 11 | not_started |
 | Database/data models | 2 | not_started |
 | Caching | 2, 4, 10 | not_started |
 | Background jobs/queues | 2, 10 | not_started |
-| Error handling, retries, and API rate limits | 1, 4, 21-resilience coverage through all phases | not_started |
-| Logging and monitoring | 1, 10, 13 | not_started |
-| Testing requirements | all phases | not_started |
-| API documentation | 1, 13 | not_started |
-| Deployment/configuration requirements | 1, 13 | not_started |
+| Error handling, retries, and API rate limits | 1, 4, 21-resilience coverage through all phases | in_progress |
+| Logging and monitoring | 1, 10, 13 | in_progress |
+| Testing requirements | all phases | in_progress |
+| API documentation | 1, 13 | in_progress |
+| Deployment/configuration requirements | 1, 13 | in_progress |
 | New ML architecture from scratch | 7, 8, 9, 13 | not_started |
 | ML monitoring, drift, retraining, rollback | 9, 13 | not_started |
-| Existing frontend API integration only | 1, 12 | not_started |
+| Existing frontend API integration only | 1, 12 | in_progress |
 
 ## ML Non-Reuse Control
 
@@ -124,6 +140,10 @@ Rules to enforce during ML phases:
 | ML labeled dataset availability | open | Model promotion may be blocked or restricted to shadow/advisory mode. | Start data sourcing and label governance in Phase 7, with preparation earlier if possible. |
 | Existing tracked deletions | open | Risk of accidentally committing unrelated deletions. | Stage only intended planning files unless user explicitly approves cleanup. |
 | Current backend/frontend PRD compliance | assessed | Baseline conflicts and missing contracts are now known; feature-level compliance remains unimplemented. | Address findings phase by phase, beginning with Phase 1. |
+| TestClient deprecation warning | open | The current FastAPI/Starlette compatibility layer warns that its HTTPX TestClient path is deprecated. Tests pass and behavior is unaffected. | Replace the transport when the framework provides the supported migration path; keep warning visible meanwhile. |
+| Legacy handler internals | open | Existing compatibility routers still contain direct database/business logic while staged domain migration proceeds. | Move handlers behind the new controller/service/repository boundaries in their owning functional phases. |
+| Provider result-state normalization | open | Legacy provider functions can represent both a successful empty history and some provider failures as an empty list. Synthetic fallback is removed, but complete/partial/unavailable coverage awaits adapters. | Implement typed provider adapters and normalized coverage in Phase 4. |
+| WebSocket authorization/durability | open | Compatibility WebSocket remains process-local and unauthenticated. | Add scoped authentication in Phase 3 and durable replay/status behavior in Phase 10. |
 
 ## Command Log
 
@@ -140,6 +160,12 @@ Rules to enforce during ML phases:
 | 2026-09-12 | Static inventory using `rg`, `rg --files`, and `git ls-files` | Recorded routes, models, services, frontend API consumers, fixtures, ignored local state, and tracked PDF outputs in `phase_0_baseline.md`. |
 | 2026-09-12 | `git commit -m "Complete SIH26183 Phase 0 baseline"` | Created commit `979864b22cdc23a49bd8b6ef9efa30e56a04a37c`, authored by `Ali <alizamir9992@gmail.com>`. |
 | 2026-09-12 | `git push origin sih26183/implementation` and `git ls-remote origin refs/heads/sih26183/implementation` | Push succeeded and the remote branch resolved to `979864b22cdc23a49bd8b6ef9efa30e56a04a37c`. |
+| 2026-09-12 | `python -m pip install -r requirements-dev.txt` | Confirmed pinned runtime packages and installed pytest 9.0.2. |
+| 2026-09-12 | `python -m pytest` | Final Phase 1 run collected 21 tests: all passed in 1.75s; one documented TestClient deprecation warning remains. |
+| 2026-09-12 | Python AST parse of repository backend files | Parsed all 57 Python files successfully. |
+| 2026-09-12 | `python -m pip check` and application OpenAPI import | No broken requirements; application version `1.1.0-phase1`; OpenAPI contains 19 paths. |
+| 2026-09-12 | `npm run lint` | Exited 0 with the same pre-existing frontend warnings recorded in Phase 0. |
+| 2026-09-12 | `npm run build` | Exited 0; 256 modules built; the existing 576.07 kB main chunk warning remains. |
 
 ## Phase Completion Log
 

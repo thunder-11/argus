@@ -1,7 +1,7 @@
 """Cases, Alerts, VASP, Notices, Reports, and Dashboard routers."""
 import base64
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from models import (
     LegalNotice, ForensicReport, User, Transaction, Wallet,
 )
 from auth.utils import get_current_user, require_role
+from app.utils.pagination import PageWindow, page_payload
 from services.report_generator import generate_freeze_notice, generate_forensic_report
 from services.correlation import find_linked_cases
 from services.risk_scoring import compute_risk_score
@@ -27,6 +28,8 @@ cases_router = APIRouter(prefix="/api/v1/cases", tags=["Cases"])
 def list_cases(
     status: str = None,
     fraud_type: str = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -38,9 +41,10 @@ def list_cases(
     if fraud_type:
         query = query.filter(Case.fraud_typology == fraud_type)
 
-    cases = query.order_by(Case.created_at.desc()).all()
-    return {
-        "cases": [
+    window = PageWindow(page=page, page_size=page_size)
+    total = query.count()
+    cases = query.order_by(Case.created_at.desc()).offset(window.offset).limit(window.page_size).all()
+    items = [
             {
                 "id": c.id,
                 "external_complaint_id": c.external_complaint_id,
@@ -56,9 +60,8 @@ def list_cases(
                 "created_at": c.created_at.isoformat() if c.created_at else None,
             }
             for c in cases
-        ],
-        "total": len(cases),
-    }
+        ]
+    return page_payload(items, total, window, cases=items)
 
 
 @cases_router.get("/{case_id}")
@@ -106,11 +109,18 @@ alerts_router = APIRouter(prefix="/api/v1/alerts", tags=["Alerts"])
 
 
 @alerts_router.get("")
-def list_alerts(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    alerts = db.query(Alert).filter_by(user_id=user.id).order_by(Alert.created_at.desc()).limit(50).all()
-    unread = db.query(Alert).filter_by(user_id=user.id, is_read=False).count()
-    return {
-        "alerts": [
+def list_alerts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    query = db.query(Alert).filter_by(user_id=user.id)
+    window = PageWindow(page=page, page_size=page_size)
+    total = query.count()
+    alerts = query.order_by(Alert.created_at.desc()).offset(window.offset).limit(window.page_size).all()
+    unread = query.filter_by(is_read=False).count()
+    items = [
             {
                 "id": a.id,
                 "case_id": a.case_id,
@@ -122,9 +132,8 @@ def list_alerts(db: Session = Depends(get_db), user: User = Depends(get_current_
                 "created_at": a.created_at.isoformat() if a.created_at else None,
             }
             for a in alerts
-        ],
-        "unread_count": unread,
-    }
+        ]
+    return page_payload(items, total, window, alerts=items, unread_count=unread)
 
 
 @alerts_router.put("/{alert_id}/read")
@@ -144,10 +153,17 @@ vasp_router = APIRouter(prefix="/api/v1/vasp", tags=["VASP Directory"])
 
 
 @vasp_router.get("/directory")
-def list_vasp_directory(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    vasps = db.query(VaspDirectory).order_by(VaspDirectory.vasp_name).all()
-    return {
-        "vasps": [
+def list_vasp_directory(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    query = db.query(VaspDirectory)
+    window = PageWindow(page=page, page_size=page_size)
+    total = query.count()
+    vasps = query.order_by(VaspDirectory.vasp_name).offset(window.offset).limit(window.page_size).all()
+    items = [
             {
                 "id": v.id,
                 "vasp_name": v.vasp_name,
@@ -159,18 +175,25 @@ def list_vasp_directory(db: Session = Depends(get_db), user: User = Depends(get_
                 "address_count": db.query(VaspAddress).filter_by(vasp_id=v.id).count(),
             }
             for v in vasps
-        ],
-    }
+        ]
+    return page_payload(items, total, window, vasps=items)
 
 
 @vasp_router.get("/addresses")
-def list_vasp_addresses(vasp_id: str = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_vasp_addresses(
+    vasp_id: str = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     query = db.query(VaspAddress)
     if vasp_id:
         query = query.filter_by(vasp_id=vasp_id)
-    addrs = query.all()
-    return {
-        "addresses": [
+    window = PageWindow(page=page, page_size=page_size)
+    total = query.count()
+    addrs = query.offset(window.offset).limit(window.page_size).all()
+    items = [
             {
                 "address": a.address,
                 "chain": a.chain,
@@ -180,8 +203,8 @@ def list_vasp_addresses(vasp_id: str = None, db: Session = Depends(get_db), user
                 "is_verified": a.is_verified,
             }
             for a in addrs
-        ],
-    }
+        ]
+    return page_payload(items, total, window, addresses=items)
 
 
 class VaspAddressCreate(BaseModel):

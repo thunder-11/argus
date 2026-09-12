@@ -1,6 +1,6 @@
 """
 Multi-chain blockchain data fetcher — unified interface.
-Uses real APIs when keys are available, falls back to demo data otherwise.
+Uses real APIs in live mode and isolated fixtures only in explicit fixture mode.
 """
 import re
 from datetime import datetime, timezone, timedelta
@@ -61,20 +61,18 @@ def fetch_transactions(address: str, chain: str, db: Session, after_time: dateti
     """
     Fetch all transactions for an address.
     1. Check DB cache first (6h TTL).
-    2. If USE_DEMO_DATA or address starts with demo prefix, return demo transactions.
-    3. Otherwise call real blockchain API.
+    2. If explicit fixture mode is active, return fixture transactions.
+    3. Otherwise call a real provider without synthesizing a result.
     """
     # Check DB cache
     cached = _get_cached_transactions(address, chain, db)
     if cached:
         txs = cached
-    elif _is_demo_address(address) or USE_DEMO_DATA:
+    elif USE_DEMO_DATA:
         txs = _get_demo_transactions(address, chain, db)
     else:
         txs = _fetch_from_api(address, chain)
-        if not txs:
-            txs = _get_demo_transactions(address, chain, db)
-        else:
+        if txs:
             _cache_transactions(txs, db)
 
     # Apply time filter if provided (with 2-hour grace margin)

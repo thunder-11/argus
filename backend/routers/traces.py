@@ -11,6 +11,7 @@ from services.tracer import execute_trace
 from services.risk_scoring import compute_risk_score
 from services.correlation import find_linked_cases
 from config import DEFAULT_MAX_HOPS
+from app.core.errors import ApplicationError
 
 router = APIRouter(prefix="/api/v1/cases", tags=["Traces"])
 
@@ -40,17 +41,25 @@ def execute_case_trace(case_id: str, req: TraceRequest, db: Session = Depends(ge
         if not origin:
             origin = db.query(CaseWallet).filter_by(case_id=case_id).first()
         if not origin:
-            # Seed a default victim wallet for this case so it never fails
-            origin_addr = f"TDEMO_VICTIM_WALLET_{case_id[-3:] if len(case_id)>=3 else '001'}"
-            origin = CaseWallet(case_id=case_id, wallet_address=origin_addr, wallet_chain="TRON", hop_depth=0, is_origin_reported=True)
-            db.add(origin)
-            db.flush()
+            raise ApplicationError(
+                code="ORIGIN_WALLET_REQUIRED",
+                message="The case has no validated origin wallet",
+                status_code=422,
+                details={"case_id": case_id},
+            )
         start_wallet = origin.wallet_address
-        chain = chain or origin.wallet_chain or "TRON"
+        chain = chain or origin.wallet_chain
 
     if not chain:
         from services.blockchain.fetcher import detect_chain
-        chain = detect_chain(start_wallet) or "TRON"
+        chain = detect_chain(start_wallet)
+        if not chain:
+            raise ApplicationError(
+                code="NETWORK_REQUIRED",
+                message="The wallet network is ambiguous or unsupported",
+                status_code=422,
+                details={"case_id": case_id},
+            )
 
     # Update case status
     case.status = "UNDER_INVESTIGATION"
@@ -58,7 +67,7 @@ def execute_case_trace(case_id: str, req: TraceRequest, db: Session = Depends(ge
 
     def _ws_event_callback(event_type, data):
         import asyncio
-        from main import ws_manager
+        from app.realtime import ws_manager
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():

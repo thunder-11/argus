@@ -1,0 +1,193 @@
+"""Typed runtime configuration with fail-fast production validation."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from functools import lru_cache
+import os
+from typing import Mapping
+
+
+DEVELOPMENT_SECRET = "development-only-secret-change-me"
+VALID_ENVIRONMENTS = {"development", "test", "staging", "production"}
+VALID_DATA_MODES = {"live", "fixture"}
+VALID_CHAINS = {"BTC", "ETH", "TRON", "BSC", "POLYGON"}
+
+
+class ConfigurationError(RuntimeError):
+    """Raised when runtime settings would create an unsafe or invalid service."""
+
+    def __init__(self, errors: list[str]):
+        self.errors = tuple(errors)
+        super().__init__("Invalid application configuration: " + "; ".join(errors))
+
+
+def _as_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ConfigurationError([f"Invalid boolean value: {value!r}"])
+
+
+def _as_csv(value: str | None, default: tuple[str, ...]) -> tuple[str, ...]:
+    if value is None:
+        return default
+    return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def _is_configured(value: str) -> bool:
+    normalized = value.strip().lower()
+    return bool(normalized) and "placeholder" not in normalized and not normalized.startswith("change-me")
+
+
+@dataclass(frozen=True, slots=True)
+class Settings:
+    app_env: str
+    app_version: str
+    log_level: str
+    database_url: str
+    jwt_secret_key: str
+    jwt_algorithm: str
+    access_token_expire_hours: int
+    cors_allowed_origins: tuple[str, ...]
+    data_mode: str
+    demo_enabled: bool
+    enabled_chains: tuple[str, ...]
+    etherscan_api_key: str
+    trongrid_api_key: str
+    tronscan_api_key: str
+    bscscan_api_key: str
+    polygonscan_api_key: str
+    ethereum_rpc_url: str
+    bsc_rpc_url: str
+    polygon_rpc_url: str
+    blockstream_base_url: str
+    etherscan_base_url: str
+    trongrid_base_url: str
+    bscscan_base_url: str
+    polygonscan_base_url: str
+    reports_dir: str
+    notices_dir: str
+    default_max_hops: int
+    max_hop_limit: int
+    min_amount_filter_usd: float
+    tx_cache_ttl_hours: int
+
+    @classmethod
+    def from_env(cls, environ: Mapping[str, str] | None = None) -> "Settings":
+        source = os.environ if environ is None else environ
+        app_env = source.get("APP_ENV", "development").strip().lower()
+        default_mode = "fixture" if app_env in {"development", "test"} else "live"
+        data_mode = source.get("DATA_MODE", default_mode).strip().lower()
+        demo_default = data_mode == "fixture"
+        default_origins = ("http://localhost:5173", "http://127.0.0.1:5173")
+
+        try:
+            access_hours = int(source.get("ACCESS_TOKEN_EXPIRE_HOURS", "24"))
+            default_hops = int(source.get("DEFAULT_MAX_HOPS", "4"))
+            max_hops = int(source.get("MAX_HOP_LIMIT", "6"))
+            min_amount = float(source.get("MIN_AMOUNT_FILTER_USD", "50"))
+            cache_hours = int(source.get("TX_CACHE_TTL_HOURS", "6"))
+        except ValueError as exc:
+            raise ConfigurationError([f"Invalid numeric configuration: {exc}"]) from exc
+
+        return cls(
+            app_env=app_env,
+            app_version=source.get("APP_VERSION", "1.1.0-phase1"),
+            log_level=source.get("LOG_LEVEL", "INFO").upper(),
+            database_url=source.get("DATABASE_URL", "sqlite:///./cfas.db"),
+            jwt_secret_key=source.get("JWT_SECRET_KEY", source.get("SECRET_KEY", DEVELOPMENT_SECRET)),
+            jwt_algorithm=source.get("JWT_ALGORITHM", "HS256"),
+            access_token_expire_hours=access_hours,
+            cors_allowed_origins=_as_csv(source.get("CORS_ALLOWED_ORIGINS"), default_origins),
+            data_mode=data_mode,
+            demo_enabled=_as_bool(source.get("DEMO_ENABLED"), demo_default),
+            enabled_chains=tuple(chain.upper() for chain in _as_csv(
+                source.get("ENABLED_CHAINS"), ("BTC", "ETH", "TRON", "BSC", "POLYGON")
+            )),
+            etherscan_api_key=source.get("ETHERSCAN_API_KEY", ""),
+            trongrid_api_key=source.get("TRONGRID_API_KEY", ""),
+            tronscan_api_key=source.get("TRONSCAN_API_KEY", ""),
+            bscscan_api_key=source.get("BSCSCAN_API_KEY", ""),
+            polygonscan_api_key=source.get("POLYGONSCAN_API_KEY", ""),
+            ethereum_rpc_url=source.get("ETHEREUM_RPC_URL", ""),
+            bsc_rpc_url=source.get("BSC_RPC_URL", ""),
+            polygon_rpc_url=source.get("POLYGON_RPC_URL", ""),
+            blockstream_base_url=source.get("BLOCKSTREAM_BASE_URL", "https://blockstream.info/api"),
+            etherscan_base_url=source.get("ETHERSCAN_BASE_URL", "https://api.etherscan.io/api"),
+            trongrid_base_url=source.get("TRONGRID_BASE_URL", "https://api.trongrid.io"),
+            bscscan_base_url=source.get("BSCSCAN_BASE_URL", "https://api.bscscan.com/api"),
+            polygonscan_base_url=source.get("POLYGONSCAN_BASE_URL", "https://api.polygonscan.com/api"),
+            reports_dir=source.get("REPORTS_DIR", "./reports"),
+            notices_dir=source.get("NOTICES_DIR", "./notices"),
+            default_max_hops=default_hops,
+            max_hop_limit=max_hops,
+            min_amount_filter_usd=min_amount,
+            tx_cache_ttl_hours=cache_hours,
+        )
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env == "production"
+
+    @property
+    def fixture_data_enabled(self) -> bool:
+        return self.data_mode == "fixture" and self.demo_enabled
+
+    def provider_status(self) -> dict[str, str]:
+        configured = {
+            "BTC": _is_configured(self.blockstream_base_url),
+            "ETH": _is_configured(self.etherscan_api_key) or _is_configured(self.ethereum_rpc_url),
+            "TRON": _is_configured(self.trongrid_api_key) or _is_configured(self.tronscan_api_key),
+            "BSC": _is_configured(self.bscscan_api_key) or _is_configured(self.bsc_rpc_url),
+            "POLYGON": _is_configured(self.polygonscan_api_key) or _is_configured(self.polygon_rpc_url),
+        }
+        return {
+            chain: ("configured" if configured.get(chain, False) else "missing_credentials")
+            for chain in self.enabled_chains
+        }
+
+    def validate(self) -> list[str]:
+        errors: list[str] = []
+        if self.app_env not in VALID_ENVIRONMENTS:
+            errors.append(f"APP_ENV must be one of {sorted(VALID_ENVIRONMENTS)}")
+        if self.data_mode not in VALID_DATA_MODES:
+            errors.append(f"DATA_MODE must be one of {sorted(VALID_DATA_MODES)}")
+        unknown_chains = sorted(set(self.enabled_chains) - VALID_CHAINS)
+        if unknown_chains:
+            errors.append(f"ENABLED_CHAINS contains unsupported values: {unknown_chains}")
+        if not 1 <= self.default_max_hops <= self.max_hop_limit <= 6:
+            errors.append("Tracing depth must satisfy 1 <= DEFAULT_MAX_HOPS <= MAX_HOP_LIMIT <= 6")
+        if self.access_token_expire_hours <= 0:
+            errors.append("ACCESS_TOKEN_EXPIRE_HOURS must be positive")
+        if self.data_mode == "fixture" and not self.demo_enabled:
+            errors.append("DATA_MODE=fixture requires DEMO_ENABLED=true")
+        if self.data_mode == "live" and self.demo_enabled:
+            errors.append("DATA_MODE=live requires DEMO_ENABLED=false")
+
+        if self.is_production:
+            if (not _is_configured(self.jwt_secret_key) or self.jwt_secret_key == DEVELOPMENT_SECRET
+                    or len(self.jwt_secret_key) < 32):
+                errors.append("Production JWT_SECRET_KEY must be a non-default secret of at least 32 characters")
+            if not self.cors_allowed_origins or "*" in self.cors_allowed_origins:
+                errors.append("Production CORS_ALLOWED_ORIGINS must contain explicit origins")
+            if self.fixture_data_enabled or self.demo_enabled:
+                errors.append("Production cannot enable fixture or demo data")
+            missing = [chain for chain, state in self.provider_status().items() if state != "configured"]
+            if missing:
+                errors.append(f"Production provider credentials are missing for enabled chains: {missing}")
+        return errors
+
+    def validate_startup(self) -> None:
+        errors = self.validate()
+        if errors:
+            raise ConfigurationError(errors)
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings.from_env()
