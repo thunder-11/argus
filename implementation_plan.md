@@ -148,6 +148,16 @@ Scope:
   - Boundary-equal events are excluded from default post-report view unless inclusive mode is requested.
   - Unknown event times are excluded from filtered totals and returned in separate unknown-time metadata.
   - Pre-report context may be returned as contextual nodes/edges but must not be counted in post-report totals.
+  - Add Live Post-Report Transaction Trail:
+    - Start from the victim-reported wallet and dynamically move node-to-node through validated post-report transactions toward the destination.
+    - Animate each transaction/edge and display hop, sender, receiver, amount, asset, timestamp, and current node.
+    - Dynamically update graph statistics as the trail moves, including hops, transactions, total amount, wallets/entities reached, risk indicators, and destination.
+    - Provide `Play/Pause`, `Step Forward`, `Step Back`, `Restart`, and `Speed Control`.
+    - Allow node and transaction inspection while playing or paused.
+    - Newly validated transactions may appear without page refresh while tracing is active.
+    - Use only real backend-validated transactions; never fabricate trail data.
+    - Live Trail is visualization-only and must not modify stored data, filtering rules, risk/ML results, or investigation state.
+    - End the trail at the discovered destination and show final statistics.
 - Add graph query parameters for temporal view, report event revision, boundary mode, context inclusion, chain/entity filters, amount bounds, depth, and pagination/cursors.
 - Ensure graph GET endpoints are read-only and never trigger tracing side effects.
 
@@ -156,10 +166,13 @@ Tests and checks:
 - Tests for contextual pre-report edges excluded from post-report totals.
 - 5-hop and 6-hop graph tests with bounded limits.
 - Cursor and filter composition tests.
+- Tests for Live Trail progression, statistics updates, playback controls, speed, restart, and destination completion.
+- Tests confirming Live Trail does not modify stored graph, risk, ML, or investigation data.
 
 Exit criteria:
 - Graph APIs satisfy all temporal filtering acceptance criteria.
 - Pre-report evidence and post-report activity remain separate in responses and reports.
+- Live Trail dynamically traverses the post-report transaction path with synchronized statistics and playback controls.
 - Progress is updated and the phase commit is pushed.
 
 ## Phase 6 - Attribution and Deterministic Analytics
@@ -370,4 +383,3 @@ For every phase:
 8. Push to `origin sih26183/implementation`.
 9. Verify the remote commit SHA.
 10. Update `progress.md` with the verified SHA before starting the next phase.
-

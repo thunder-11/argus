@@ -9,15 +9,15 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_0_complete`  
+Overall status: `phase_0_in_progress`
 Last updated: 2026-09-12 Asia/Calcutta  
-Current objective: Phase 0 planning checkpoint completed; Phase 1 is ready to start.
+Current objective: Finalize and remotely verify the Phase 0 runtime baseline and traceability map.
 
 ## Phase Tracker
 
 | Phase | Name | Status | Commit | Remote verification | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 0 | Planning and Baseline | complete | `dd3e162bdaff0b151b78344fda20f4c8fedeabd8` | verified on `origin/sih26183/implementation` | Planning documents created and pushed. |
+| 0 | Planning and Baseline | in_progress | pending final baseline commit | pending | Initial planning checkpoint exists; runtime baseline and traceability evidence are being finalized. |
 | 1 | Modular Backend Foundation and Test Harness | not_started | pending | pending | Awaiting Phase 0 completion. |
 | 2 | Persistence and Durable Processing | not_started | pending | pending | Awaiting Phase 1 completion. |
 | 3 | Identity, Intake, and Case Workflow | not_started | pending | pending | Awaiting Phase 2 completion. |
@@ -46,7 +46,10 @@ Recorded before implementation:
   - `progress.md`
   - `task.md`
 - Required PRD file present: `PRD_SIH26183_Backend_ML_Updated.md`.
-- Existing backend and frontend implementation work is not yet validated for PRD compliance.
+- Detailed route, model, service, frontend contract, fixture, and generated-artifact inventory is recorded in `phase_0_baseline.md`.
+- Backend startup and OpenAPI smoke checks pass against an isolated in-memory database; startup also confirms automatic seed behavior.
+- Frontend lint and production build exit successfully with recorded warnings.
+- Existing backend and frontend behavior is not yet validated for full PRD compliance; implementation begins in Phase 1.
 
 ## Phase 0 Tasks
 
@@ -60,6 +63,13 @@ Recorded before implementation:
 | Verify PRD checksum | done | `Get-FileHash -Algorithm SHA256 PRD_SIH26183_Backend_ML_Updated.md` returned `B1F7376C8E6C7F255104B2E19BEAD1A0A433D63723D6A6A681F4F19D9E09BCAA`. |
 | Commit planning checkpoint | done | Commit `dd3e162bdaff0b151b78344fda20f4c8fedeabd8` authored with local Git identity. |
 | Push planning checkpoint | done | `git ls-remote origin refs/heads/sih26183/implementation` verified remote SHA `dd3e162bdaff0b151b78344fda20f4c8fedeabd8`. |
+| Inventory backend routes, services, and models | done | `phase_0_baseline.md` records 17 OpenAPI paths, the WebSocket route, 12 SQLAlchemy models, service responsibilities, and material gaps. |
+| Inventory frontend API usage and fixtures | done | `phase_0_baseline.md` records consumed API areas, hardcoded base URL, fixture-backed pages, and missing target contracts. |
+| Inventory generated/local artifacts | done | Tracked PDFs and ignored databases, env file, caches, dependencies, and build output are recorded without exposing secrets. |
+| Run backend dependency/startup checks | done | `pip check` passed; isolated FastAPI startup returned HTTP 200 for root and OpenAPI with 17 paths. Dependency drift and deprecation warning are recorded. |
+| Run frontend lint/build checks | done | Both commands exited 0; lint findings and the Vite chunk-size warning are recorded. |
+| Map acceptance/checklist requirements to phases | done | `phase_0_baseline.md` maps AC-01-AC-24, TG-01-TG-14, ML-01-ML-24, and CK-01.01-CK-12.06 to owning phases. |
+| Finalize/push Phase 0 baseline | in_progress | Pending commit and remote SHA verification. |
 
 ## Requirement Coverage Map
 
@@ -113,7 +123,7 @@ Rules to enforce during ML phases:
 | Real blockchain provider keys | open | Live API smoke tests may be skipped until keys are available. | Add env placeholders and mark live tests conditional. |
 | ML labeled dataset availability | open | Model promotion may be blocked or restricted to shadow/advisory mode. | Start data sourcing and label governance in Phase 7, with preparation earlier if possible. |
 | Existing tracked deletions | open | Risk of accidentally committing unrelated deletions. | Stage only intended planning files unless user explicitly approves cleanup. |
-| Current backend/frontend PRD compliance | open | Unknown until Phase 0/1 baseline checks finish. | Record baseline and preserve valid functionality. |
+| Current backend/frontend PRD compliance | assessed | Baseline conflicts and missing contracts are now known; feature-level compliance remains unimplemented. | Address findings phase by phase, beginning with Phase 1. |
 
 ## Command Log
 
@@ -123,7 +133,13 @@ Rules to enforce during ML phases:
 | 2026-09-12 | `Get-FileHash -Algorithm SHA256 PRD_SIH26183_Backend_ML_Updated.md` | Recorded PRD checksum `B1F7376C8E6C7F255104B2E19BEAD1A0A433D63723D6A6A681F4F19D9E09BCAA`. |
 | 2026-09-12 | `git switch -c sih26183/implementation; git add implementation_plan.md progress.md; git commit -m "Add SIH26183 implementation plan"; git push -u origin sih26183/implementation` | Created the feature branch, committed planning docs as `dd3e162bdaff0b151b78344fda20f4c8fedeabd8`, and pushed to GitHub. |
 | 2026-09-12 | `git ls-remote origin refs/heads/sih26183/implementation` | Verified remote branch points to `dd3e162bdaff0b151b78344fda20f4c8fedeabd8`. |
+| 2026-09-12 | `python --version; python -m pip check` and dependency imports/version output | Python 3.14.3 and installed dependencies load; no broken requirements; installed versions drift from the pinned requirements. |
+| 2026-09-12 | FastAPI `TestClient` startup with `DATABASE_URL=sqlite:///:memory:` and a test-only secret | Startup seed completed; root and OpenAPI returned 200; OpenAPI exposed 17 paths; current HTTPX combination emitted a deprecation warning. |
+| 2026-09-12 | `npm run lint` | Exited 0 with baseline warnings covering unused values, React effect/immutability rules, missing dependencies, and render-time randomness. |
+| 2026-09-12 | `npm run build` | Exited 0; Vite built 256 modules and warned that the 576.07 kB main chunk exceeds 500 kB. |
+| 2026-09-12 | Static inventory using `rg`, `rg --files`, and `git ls-files` | Recorded routes, models, services, frontend API consumers, fixtures, ignored local state, and tracked PDF outputs in `phase_0_baseline.md`. |
 
 ## Phase Completion Log
 
-- 2026-09-12: Phase 0 completed. Planning documents were created, committed, pushed, and remote SHA was verified.
+- 2026-09-12: Initial Phase 0 planning checkpoint was committed and pushed as `dd3e162bdaff0b151b78344fda20f4c8fedeabd8`.
+- 2026-09-12: Phase 0 reopened to add the missing runtime baseline, inventory, and requirement-to-phase mapping before final completion.
