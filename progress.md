@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_1_complete`
+Overall status: `phase_2_complete`
 Last updated: 2026-09-12 Asia/Calcutta  
-Current objective: Phase 1 is complete; Phase 2 persistence and durable processing is ready to start.
+Current objective: Phase 2 is complete; Phase 3 identity, intake, and case workflow is ready to start.
 
 ## Phase Tracker
 
@@ -19,7 +19,7 @@ Current objective: Phase 1 is complete; Phase 2 persistence and durable processi
 | --- | --- | --- | --- | --- | --- |
 | 0 | Planning and Baseline | complete | `979864b22cdc23a49bd8b6ef9efa30e56a04a37c` | verified on `origin/sih26183/implementation` | Runtime baseline, inventory, checks, and traceability map completed. |
 | 1 | Modular Backend Foundation and Test Harness | complete | `b7e34adba4d4b962bc368cc1524f9e4cf14cd200` | verified on `origin/sih26183/implementation` | 21 tests passed; modular foundation and compatibility contracts established. |
-| 2 | Persistence and Durable Processing | not_started | pending | pending | Ready to start. |
+| 2 | Persistence and Durable Processing | complete | pending phase commit | pending | 69 managed tables, immutable forensic revisions, durable jobs/outbox, cache isolation, and rebuildable graph projection contract; 35 backend tests pass. |
 | 3 | Identity, Intake, and Case Workflow | not_started | pending | pending | Awaiting Phase 2 completion. |
 | 4 | Real Blockchain Ingestion | not_started | pending | pending | Requires provider credential placeholders and optional live API keys. |
 | 5 | Tracing and Temporal Transaction Graphs | not_started | pending | pending | Includes Transaction Graph Post-Report Filtering. |
@@ -87,6 +87,24 @@ Recorded before implementation:
 | Verify existing frontend compatibility | done | `npm run lint` and `npm run build` exit 0; no frontend source or design changes were made. Existing lint and bundle-size warnings remain recorded. |
 | Finalize/push Phase 1 | done | Commit `b7e34adba4d4b962bc368cc1524f9e4cf14cd200` was pushed and independently verified with `git ls-remote`. |
 
+## Phase 2 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Remove superseded planning files | done | Removed only `PRD_Crypto_Fraud_Attribution_Prototype.md`, `checklist.md`, and `task.md`; cleanup commit `bdd8926` was pushed before Phase 2 work. |
+| Establish full migration chain | done | Alembic baseline `20260912_0000` manages the 12 compatibility tables; additive revision `20260912_0001` manages 57 Phase 2 tables. Fresh install and stamped legacy adoption paths are tested. |
+| Cover PRD §17.2 storage entities | done | The 69-table metadata covers tenant/identity, complaint/victim, report revisions, networks/assets/addresses, normalized transfers/outpoints, entities/protocols/cross-chain links, analysis/graphs/clusters, rules/risk, fresh ML lineage, review, alerts, monitoring, reports/evidence, audit, policy, jobs, and outbox records. |
+| Preserve forensic values and time | done | `ExactDecimal` avoids binary floats; raw integer values remain available. `UtcTimestamp` stores canonical UTC in SQLite and compiles to PostgreSQL `TIMESTAMP WITH TIME ZONE`. Transactions retain event, availability, ingestion, valuation, provider, block, confirmation, and finality metadata. |
+| Add immutable revision enforcement | done | ORM guards reject update/delete for evidence, run, graph, risk, prediction, explanation, review, report, audit, case history, label/feature/model lineage, and related append-only records. Corrections append revisions. |
+| Add durable jobs and transactional outbox | done | Database queue supports idempotent enqueue, row-lock claims, worker leases, expired-lease recovery, retry/failure state, and same-transaction outbox creation. Dispatcher persists at-least-once delivery and bounded retry state. |
+| Add cache isolation | done | Canonical transaction cache keys include chain, hashed wallet, provider, case, and query; registry keys include version and chain. JSON cache enforces positive TTLs and remains non-authoritative. |
+| Add rebuildable graph persistence | done | Immutable relational graph snapshots and projection checkpoints remain authoritative; `GraphProjection` defines rebuild/delete behavior for optional Neo4j or another derived store. |
+| Enforce deployed storage policy | done | Staging/production reject SQLite and fixture/demo data; production also requires Redis cache and durable broker configuration. Startup auto-creation is limited to development/test. |
+| Document storage operations | done | `backend/PERSISTENCE.md` documents schema groups, migrations, legacy stamping, temporal semantics, immutability, outbox delivery, cache policy, graph rebuilds, and recovery expectations. |
+| Verify Phase 2 | done | 35 backend tests passed in the final run; migration upgrade/downgrade and legacy adoption passed; PostgreSQL DDL compilation, repository, queue, cache, config, compatibility, and provider tests passed. `pip check`, AST parsing, startup, and OpenAPI checks passed. |
+| Verify existing frontend remains compatible | done | `npm run lint` and `npm run build` exited 0 without frontend changes; the same pre-existing lint and bundle-size warnings remain. |
+| Finalize/push Phase 2 | in_progress | Phase implementation commit and remote verification are the remaining bookkeeping steps. |
+
 ## Requirement Coverage Map
 
 | PRD Area | Planned Phase(s) | Status |
@@ -108,9 +126,9 @@ Recorded before implementation:
 | Search, filtering, pagination, and history | 11, 12 | not_started |
 | Authentication, authorization, and security | 1, 3, 20-security coverage through all phases | in_progress |
 | Audit logs | 3, 11 | not_started |
-| Database/data models | 2 | not_started |
-| Caching | 2, 4, 10 | not_started |
-| Background jobs/queues | 2, 10 | not_started |
+| Database/data models | 2 | complete |
+| Caching | 2, 4, 10 | in_progress |
+| Background jobs/queues | 2, 10 | in_progress |
 | Error handling, retries, and API rate limits | 1, 4, 21-resilience coverage through all phases | in_progress |
 | Logging and monitoring | 1, 10, 13 | in_progress |
 | Testing requirements | all phases | in_progress |
@@ -138,7 +156,8 @@ Rules to enforce during ML phases:
 | --- | --- | --- | --- |
 | Real blockchain provider keys | open | Live API smoke tests may be skipped until keys are available. | Add env placeholders and mark live tests conditional. |
 | ML labeled dataset availability | open | Model promotion may be blocked or restricted to shadow/advisory mode. | Start data sourcing and label governance in Phase 7, with preparation earlier if possible. |
-| Existing tracked deletions | open | Risk of accidentally committing unrelated deletions. | Stage only intended planning files unless user explicitly approves cleanup. |
+| Superseded tracked planning files | resolved | The user authorized their removal before Phase 2. | Exactly three files were deleted and pushed in cleanup commit `bdd8926`; the authoritative PRD and implementation trackers remain. |
+| Live PostgreSQL/Redis integration environment | open | Phase 2 validates PostgreSQL DDL and durable semantics locally but has no provisioned external services in this workspace. | Run the same migration and worker integration suite against deployed services during Phase 13 operational hardening. |
 | Current backend/frontend PRD compliance | assessed | Baseline conflicts and missing contracts are now known; feature-level compliance remains unimplemented. | Address findings phase by phase, beginning with Phase 1. |
 | TestClient deprecation warning | open | The current FastAPI/Starlette compatibility layer warns that its HTTPX TestClient path is deprecated. Tests pass and behavior is unaffected. | Replace the transport when the framework provides the supported migration path; keep warning visible meanwhile. |
 | Legacy handler internals | open | Existing compatibility routers still contain direct database/business logic while staged domain migration proceeds. | Move handlers behind the new controller/service/repository boundaries in their owning functional phases. |
@@ -168,6 +187,12 @@ Rules to enforce during ML phases:
 | 2026-09-12 | `npm run build` | Exited 0; 256 modules built; the existing 576.07 kB main chunk warning remains. |
 | 2026-09-12 | `git commit -m "Implement SIH26183 Phase 1 backend foundation"` | Created commit `b7e34adba4d4b962bc368cc1524f9e4cf14cd200`, authored by `Ali <alizamir9992@gmail.com>`. |
 | 2026-09-12 | `git push origin sih26183/implementation` and `git ls-remote origin refs/heads/sih26183/implementation` | Push succeeded and the remote branch resolved to `b7e34adba4d4b962bc368cc1524f9e4cf14cd200`. |
+| 2026-09-12 | Staged only the three user-authorized deletions; `git commit -m "Remove superseded planning files"`; push | Cleanup commit `bdd8926` removed the superseded prototype PRD, checklist, and task notes and was pushed using the configured user identity. |
+| 2026-09-12 | `python -m pip install -r requirements-dev.txt` | Installed the pinned Alembic 1.16.5 and psycopg 3.2.10 dependencies; existing dependencies remained satisfied. |
+| 2026-09-12 | `python -m pytest -p no:cacheprovider` | Final Phase 2 suite collected 35 tests and all passed in 3.26 seconds; only the previously recorded TestClient deprecation warning remains. |
+| 2026-09-12 | `python -m alembic heads`; schema inventory and PostgreSQL DDL compilation | Confirmed a single head at `20260912_0001`, 12 baseline plus 57 Phase 2 tables, unique table registry, fresh/stamped migration paths, and timezone-aware PostgreSQL columns. |
+| 2026-09-12 | `python -m pip check`; Python AST parse; application startup/OpenAPI smoke | No broken requirements; all 72 backend Python files parsed; root/OpenAPI returned 200 with application version `1.2.0-phase2` and 19 paths. |
+| 2026-09-12 | `npm run lint`; `npm run build` | Both exited 0 without frontend changes; existing lint and 576.07 kB chunk warnings remain unchanged. |
 
 ## Phase Completion Log
 
@@ -175,3 +200,5 @@ Rules to enforce during ML phases:
 - 2026-09-12: Phase 0 reopened to add the missing runtime baseline, inventory, and requirement-to-phase mapping before final completion.
 - 2026-09-12: Phase 0 completed. Backend startup/OpenAPI and frontend lint/build checks were recorded; all PRD acceptance and checklist IDs were assigned to implementation phases; commit `979864b22cdc23a49bd8b6ef9efa30e56a04a37c` was verified on GitHub.
 - 2026-09-12: Phase 1 completed. Modular backend boundaries, validated runtime modes, canonical errors/request IDs/pagination, explicit fixture isolation, dependency pins, health endpoints, OpenAPI contracts, and a 21-test backend suite were committed as `b7e34adba4d4b962bc368cc1524f9e4cf14cd200` and verified on GitHub.
+- 2026-09-12: The user-authorized cleanup removed three superseded tracked planning files in commit `bdd8926` before Phase 2 implementation began.
+- 2026-09-12: Phase 2 implementation and local verification completed. The migration chain manages 69 tables, preserves point-in-time forensic data, provides immutable revisions, and adds durable idempotent jobs/outbox, isolated cache keys, and rebuildable graph projection contracts. Phase commit and remote SHA verification are pending.

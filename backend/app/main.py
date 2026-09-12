@@ -24,7 +24,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        init_db()
+        if not runtime.is_deployed:
+            init_db()
         if runtime.fixture_data_enabled:
             db = SessionLocal()
             try:

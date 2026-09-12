@@ -76,6 +76,16 @@ class Settings:
     max_hop_limit: int
     min_amount_filter_usd: float
     tx_cache_ttl_hours: int
+    redis_cache_url: str
+    redis_registry_url: str
+    celery_broker_url: str
+    celery_result_backend: str
+    neo4j_uri: str
+    neo4j_user: str
+    neo4j_password: str
+    job_lease_seconds: int
+    job_max_attempts: int
+    outbox_batch_size: int
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> "Settings":
@@ -92,12 +102,15 @@ class Settings:
             max_hops = int(source.get("MAX_HOP_LIMIT", "6"))
             min_amount = float(source.get("MIN_AMOUNT_FILTER_USD", "50"))
             cache_hours = int(source.get("TX_CACHE_TTL_HOURS", "6"))
+            job_lease_seconds = int(source.get("JOB_LEASE_SECONDS", "60"))
+            job_max_attempts = int(source.get("JOB_MAX_ATTEMPTS", "5"))
+            outbox_batch_size = int(source.get("OUTBOX_BATCH_SIZE", "100"))
         except ValueError as exc:
             raise ConfigurationError([f"Invalid numeric configuration: {exc}"]) from exc
 
         return cls(
             app_env=app_env,
-            app_version=source.get("APP_VERSION", "1.1.0-phase1"),
+            app_version=source.get("APP_VERSION", "1.2.0-phase2"),
             log_level=source.get("LOG_LEVEL", "INFO").upper(),
             database_url=source.get("DATABASE_URL", "sqlite:///./cfas.db"),
             jwt_secret_key=source.get("JWT_SECRET_KEY", source.get("SECRET_KEY", DEVELOPMENT_SECRET)),
@@ -128,11 +141,25 @@ class Settings:
             max_hop_limit=max_hops,
             min_amount_filter_usd=min_amount,
             tx_cache_ttl_hours=cache_hours,
+            redis_cache_url=source.get("REDIS_CACHE_URL", ""),
+            redis_registry_url=source.get("REDIS_REGISTRY_URL", ""),
+            celery_broker_url=source.get("CELERY_BROKER_URL", ""),
+            celery_result_backend=source.get("CELERY_RESULT_BACKEND", ""),
+            neo4j_uri=source.get("NEO4J_URI", ""),
+            neo4j_user=source.get("NEO4J_USER", ""),
+            neo4j_password=source.get("NEO4J_PASSWORD", ""),
+            job_lease_seconds=job_lease_seconds,
+            job_max_attempts=job_max_attempts,
+            outbox_batch_size=outbox_batch_size,
         )
 
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def is_deployed(self) -> bool:
+        return self.app_env in {"staging", "production"}
 
     @property
     def fixture_data_enabled(self) -> bool:
@@ -164,10 +191,18 @@ class Settings:
             errors.append("Tracing depth must satisfy 1 <= DEFAULT_MAX_HOPS <= MAX_HOP_LIMIT <= 6")
         if self.access_token_expire_hours <= 0:
             errors.append("ACCESS_TOKEN_EXPIRE_HOURS must be positive")
+        if self.job_lease_seconds <= 0 or self.job_max_attempts <= 0 or self.outbox_batch_size <= 0:
+            errors.append("JOB_LEASE_SECONDS, JOB_MAX_ATTEMPTS, and OUTBOX_BATCH_SIZE must be positive")
         if self.data_mode == "fixture" and not self.demo_enabled:
             errors.append("DATA_MODE=fixture requires DEMO_ENABLED=true")
         if self.data_mode == "live" and self.demo_enabled:
             errors.append("DATA_MODE=live requires DEMO_ENABLED=false")
+
+        if self.is_deployed:
+            if self.fixture_data_enabled or self.demo_enabled:
+                errors.append("Staging/production cannot enable fixture or demo data")
+            if not self.database_url.startswith(("postgresql://", "postgresql+psycopg://")):
+                errors.append("Staging/production DATABASE_URL must use PostgreSQL")
 
         if self.is_production:
             if (not _is_configured(self.jwt_secret_key) or self.jwt_secret_key == DEVELOPMENT_SECRET
@@ -175,11 +210,13 @@ class Settings:
                 errors.append("Production JWT_SECRET_KEY must be a non-default secret of at least 32 characters")
             if not self.cors_allowed_origins or "*" in self.cors_allowed_origins:
                 errors.append("Production CORS_ALLOWED_ORIGINS must contain explicit origins")
-            if self.fixture_data_enabled or self.demo_enabled:
-                errors.append("Production cannot enable fixture or demo data")
             missing = [chain for chain, state in self.provider_status().items() if state != "configured"]
             if missing:
                 errors.append(f"Production provider credentials are missing for enabled chains: {missing}")
+            if not _is_configured(self.redis_cache_url):
+                errors.append("Production REDIS_CACHE_URL must be configured")
+            if not _is_configured(self.celery_broker_url):
+                errors.append("Production CELERY_BROKER_URL must be configured")
         return errors
 
     def validate_startup(self) -> None:

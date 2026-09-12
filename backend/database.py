@@ -31,4 +31,5 @@ def get_db():
 def init_db():
     """Create all tables. Call once at startup."""
     import models  # noqa: F401 — registers models with Base
+    import app.persistence.models  # noqa: F401 — local/test schema registration
     Base.metadata.create_all(bind=engine)

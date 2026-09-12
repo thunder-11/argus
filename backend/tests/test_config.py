@@ -53,3 +53,32 @@ def test_invalid_runtime_mode_is_rejected():
 
     with pytest.raises(ConfigurationError, match="DATA_MODE"):
         settings.validate_startup()
+
+
+def test_production_requires_postgres_and_durable_service_configuration():
+    settings = Settings.from_env({
+        "APP_ENV": "production",
+        "DATA_MODE": "live",
+        "DEMO_ENABLED": "false",
+        "JWT_SECRET_KEY": "a-secure-production-secret-that-is-long-enough",
+        "CORS_ALLOWED_ORIGINS": "https://investigator.example",
+        "ENABLED_CHAINS": "BTC",
+        "DATABASE_URL": "postgresql+psycopg://service:password@db:5432/sih26183",
+        "REDIS_CACHE_URL": "redis://cache:6379/0",
+        "CELERY_BROKER_URL": "redis://queue:6379/1",
+    })
+
+    settings.validate_startup()
+
+
+def test_staging_rejects_sqlite_and_fixture_data():
+    settings = Settings.from_env({
+        "APP_ENV": "staging",
+        "DATA_MODE": "fixture",
+        "DEMO_ENABLED": "true",
+        "DATABASE_URL": "sqlite:///./staging.db",
+    })
+
+    errors = settings.validate()
+    assert any("fixture or demo data" in error for error in errors)
+    assert any("DATABASE_URL must use PostgreSQL" in error for error in errors)

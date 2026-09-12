@@ -20,6 +20,8 @@ API routes validate HTTP input and call controllers. Controllers orchestrate app
 | `app/core` | Typed configuration, errors, structured logging, and shared policies |
 | `app/schemas` | Canonical request and response models |
 | `app/utils` | Small side-effect-free utilities |
+| `app/persistence` | Exact forensic records, append-only revisions, and rebuildable graph projection contracts |
+| `app/cache` | Redis-compatible cache boundaries and tenant/provider-isolated keys |
 
 The existing `auth`, `routers`, and `services` modules remain temporary compatibility adapters so the current frontend contracts continue working during phased migration. New domain work belongs in `app`; later phases migrate each legacy handler behind controllers and repositories without changing the frontend unexpectedly.
 
@@ -29,6 +31,14 @@ The existing `auth`, `routers`, and `services` modules remain temporary compatib
 
 Readiness reports only configured/missing provider state. It never returns credential values. The application seeds data only when fixture mode is explicitly enabled.
 Trace requests no longer create a synthetic origin wallet or guess TRON when the case lacks a validated network.
+
+## Phase 2 Storage Boundaries
+
+PostgreSQL is authoritative outside explicit local/test fixture mode. The additive Phase 2 schema preserves the current frontend-facing legacy schema while new services move to normalized records with exact values, UTC event/available/ingestion timestamps, provider provenance, and chain finality. Immutable evidence and result records are corrected through new revisions rather than mutation.
+
+The database-backed job queue and transactional outbox provide durable, idempotent work requests and at-least-once event delivery. Transport workers can later publish outbox envelopes to Celery/Redis without placing transport state inside domain services. Cache keys include chain, wallet digest, provider, case, and query dimensions. Graph databases are derived projections; immutable relational graph snapshots remain authoritative and can rebuild them.
+
+Migration and recovery details are documented in `PERSISTENCE.md`.
 
 ## API Conventions Established in Phase 1
 
