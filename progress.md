@@ -22,7 +22,7 @@ Current objective: Phase 5 is complete; Phase 6 attribution and deterministic an
 | 2 | Persistence and Durable Processing | complete | `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e` | verified on `origin/sih26183/implementation` | 69 managed tables, immutable forensic revisions, durable jobs/outbox, cache isolation, and rebuildable graph projection contract; 35 backend tests pass. |
 | 3 | Identity, Intake, and Case Workflow | complete | `90b9d877ea178b0a642fa60e70afde715252cbe7` | verified on `origin/sih26183/implementation` | Session revocation, agency/case scope, exact intake/report time, immutable corrections, case workflow, audit, and exactly-once initial queueing; 41 backend tests pass. |
 | 4 | Real Blockchain Ingestion | complete | `23b30b21081f21ef51448cae0951180f6d46d92e` | verified on `origin/sih26183/implementation` | Typed BTC/ETH/TRON/BSC/Polygon adapters, exact normalized persistence, provider provenance, resilient pagination/retry/finality handling, and a scoped durable refresh contract; 50 backend tests pass and one opt-in live smoke test is skipped without credentials. |
-| 5 | Tracing and Temporal Transaction Graphs | complete | `dc317a3576f96a93ef14270d3f84dae5d2180850` | pending | Bounded evidence paths, immutable graph snapshots, report-event time partitions, side-effect-free graph queries, cursors, and visualization-only live trails are implemented. |
+| 5 | Tracing and Temporal Transaction Graphs | complete | `dc317a3576f96a93ef14270d3f84dae5d2180850` | verified on `origin/sih26183/implementation` | Bounded evidence paths, immutable graph snapshots, report-event time partitions, side-effect-free graph queries, cursors, and visualization-only live trails are implemented. |
 | 6 | Attribution and Deterministic Analytics | not_started | pending | pending | VASP labels, clustering, typologies, and rule evidence. |
 | 7 | Fresh ML Data and Feature Platform | not_started | pending | pending | Existing backend ML must not be reused. |
 | 8 | Fresh ML Training, Validation, and Evaluation | not_started | pending | pending | Promotion depends on measurable PRD quality gates. |
@@ -150,7 +150,7 @@ Recorded before implementation:
 | Preserve decision state | done | The live trail only returns ordered actual transfers and client controls; it creates no playback state and does not alter cases, risk, ML, or investigations. |
 | Verify Phase 5 | done | 52 backend tests pass, one deliberately gated provider smoke test is skipped, and OpenAPI contains all four Phase 5 read contracts. |
 | Verify frontend compatibility | done | No frontend source changed; lint and production build pass with the recorded baseline warnings. |
-| Finalize/push Phase 5 | in_progress | Implementation commit `dc317a3576f96a93ef14270d3f84dae5d2180850` is ready to push and verify. |
+| Finalize/push Phase 5 | done | Implementation commit `dc317a3576f96a93ef14270d3f84dae5d2180850` and progress commit `1570ca6e9abc81108d6923e6a91b3a24b0f2fe7d` were pushed and independently verified. |
 
 ## Requirement Coverage Map
 
@@ -255,6 +255,7 @@ Rules to enforce during ML phases:
 | 2026-09-13 | `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q`; OpenAPI assertion | 52 tests passed, one explicit live provider smoke test was skipped, and two existing TestClient/AnyIO deprecation warnings remain. Version `1.5.0-phase5` exposes 38 paths including graph, transaction, live-trail, and trace-path reads. |
 | 2026-09-13 | `npm run lint`; `npm run build` | Lint passed with the existing frontend warnings. The sandbox could not spawn Vite's child process; the approved normal-environment build completed 256 modules with the unchanged 576.07 kB chunk-size warning. No frontend source changed. |
 | 2026-09-13 | `git commit -m "Implement SIH26183 Phase 5 temporal graphs"` | Created Phase 5 implementation commit `dc317a3576f96a93ef14270d3f84dae5d2180850` as `Ali <alizamir9992@gmail.com>`. |
+| 2026-09-13 | `git push origin sih26183/implementation`; `git ls-remote origin refs/heads/sih26183/implementation` | Pushed Phase 5 and verified the remote branch at progress commit `1570ca6e9abc81108d6923e6a91b3a24b0f2fe7d`. |
 
 ## Phase Completion Log
 
