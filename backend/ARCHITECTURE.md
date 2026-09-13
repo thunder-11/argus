@@ -25,6 +25,12 @@ API routes validate HTTP input and call controllers. Controllers orchestrate app
 
 The existing `auth`, `routers`, and `services` modules remain temporary compatibility adapters so the current frontend contracts continue working during phased migration. New domain work belongs in `app`; later phases migrate each legacy handler behind controllers and repositories without changing the frontend unexpectedly.
 
+Phase 6 deterministic analytics live in `app/analytics/deterministic.py`; sourced
+entity attribution, conservative clustering, and qualified correlation live in
+`app/services`. They consume normalized evidence and do not import legacy risk,
+tracing, or ML implementations. Policy and confidence semantics are documented
+in `ANALYTICS.md`.
+
 ## Runtime Modes
 
 `DATA_MODE=fixture` requires `DEMO_ENABLED=true` and is limited to development or test operation. `DATA_MODE=live` never falls back to generated transactions. Production startup rejects fixture data, demo mode, wildcard CORS, placeholder/default JWT secrets, unsupported chains, invalid trace limits, and missing credentials for enabled chains.
