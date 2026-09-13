@@ -847,6 +847,21 @@ class ModelPackage(Base, ImmutableRecord):
     created_at = Column(UtcTimestamp(), nullable=False, default=utc_now)
 
 
+class ModelLifecycleEvent(Base, ImmutableRecord):
+    """Append-only registry transition; package bytes and prior predictions never change."""
+    __tablename__ = "ml_model_lifecycle_events"
+    id = Column(String(36), primary_key=True, default=new_id)
+    package_id = Column(String(36), ForeignKey("ml_model_packages.id", ondelete="CASCADE"), nullable=False, index=True)
+    prior_package_id = Column(String(36), ForeignKey("ml_model_packages.id"))
+    transition = Column(String(24), nullable=False)
+    traffic_percent = Column(Integer, nullable=False, default=0)
+    reason = Column(Text, nullable=False)
+    actor_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    scope = Column(JSON, nullable=False, default=dict)
+    occurred_at = Column(UtcTimestamp(), nullable=False, default=utc_now)
+    __table_args__ = (CheckConstraint("traffic_percent >= 0 AND traffic_percent <= 100", name="ck_ml_lifecycle_traffic"),)
+
+
 class PredictionExplanation(Base, ImmutableRecord):
     __tablename__ = "ml_prediction_explanations"
     id = Column(String(36), primary_key=True, default=new_id)
@@ -1003,7 +1018,7 @@ PHASE2_TABLE_NAMES = (
     "bitcoin_outpoints", "protocol_contracts", "cross_chain_links", "clusters",
     "cluster_memberships", "rule_findings", "ml_dataset_snapshots", "ml_dataset_sources",
     "ml_label_revisions", "ml_label_adjudications", "ml_feature_definitions",
-    "ml_feature_snapshots", "ml_split_manifests", "ml_experiment_runs", "ml_model_packages",
+    "ml_feature_snapshots", "ml_split_manifests", "ml_experiment_runs", "ml_model_packages", "ml_model_lifecycle_events",
     "ml_prediction_explanations", "ml_drift_evaluations", "ml_retraining_requests",
     "alert_recipients", "alert_deliveries", "alert_triggers", "deposit_decisions", "monitoring_subscriptions",
     "evidence_objects", "evidence_manifests", "policy_settings",
@@ -1021,7 +1036,7 @@ for _immutable_model in (
     CaseAttachment, IdempotencyRecord,
     BitcoinOutpoint, CrossChainLink, Cluster, ClusterMembership, RuleFinding,
     DatasetSnapshot, DatasetSource, LabelRevision, LabelAdjudication, FeatureDefinition,
-    FeatureSnapshot, SplitManifest, ExperimentRun, ModelPackage, PredictionExplanation,
+    FeatureSnapshot, SplitManifest, ExperimentRun, ModelPackage, ModelLifecycleEvent, PredictionExplanation,
     DriftEvaluation, AlertTrigger, DepositDecision, EvidenceObject, EvidenceManifest, PolicySetting,
 ):
     event.listen(_immutable_model, "before_update", _prevent_change)
