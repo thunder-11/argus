@@ -174,11 +174,16 @@ def case_status(case_id: str, db: Session = Depends(get_db), user: User = Depend
     case = get_accessible_case(db, user, case_id)
     runs = db.query(AnalysisRun).filter(AnalysisRun.case_id == case.id).order_by(AnalysisRun.revision.desc()).all()
     report = db.query(ReportEvent).filter(ReportEvent.id == case.primary_report_event_id).first()
+    jobs = db.query(BackgroundJob).filter(BackgroundJob.case_id == case.id).order_by(BackgroundJob.updated_at.desc()).all()
     return {"case_id": case.id, "case_lifecycle": LEGACY_TO_CANONICAL.get(case.status, case.status),
             "compatibility_status": CANONICAL_TO_LEGACY.get(case.status, case.status), "revision": case.revision,
             "selected_report_event": _report_dict(report) if report else None,
             "analysis_runs": [{"id": run.id, "state": run.state, "stage": run.stage,
-                               "revision": run.revision} for run in runs]}
+                               "revision": run.revision, "coverage": run.coverage, "error_code": run.error_code} for run in runs],
+            "jobs": [{"id": job.id, "operation": job.operation, "state": job.state, "attempt": job.attempt,
+                      "max_attempts": job.max_attempts, "last_error_code": job.last_error_code,
+                      "next_attempt_at": job.next_attempt_at.isoformat()} for job in jobs],
+            "poll_after_seconds": 3, "event_stream": f"/api/v1/cases/{case.id}/events"}
 
 
 @router.get("/traces/{trace_id}")
