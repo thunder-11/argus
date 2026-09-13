@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_4_complete_pending_commit`
+Overall status: `phase_4_complete`
 Last updated: 2026-09-13 Asia/Calcutta
-Current objective: Phase 4 real blockchain ingestion is implemented and verified; commit and remote verification remain.
+Current objective: Phase 4 is complete; Phase 5 tracing and temporal transaction graphs are ready to start.
 
 ## Phase Tracker
 
@@ -21,7 +21,7 @@ Current objective: Phase 4 real blockchain ingestion is implemented and verified
 | 1 | Modular Backend Foundation and Test Harness | complete | `b7e34adba4d4b962bc368cc1524f9e4cf14cd200` | verified on `origin/sih26183/implementation` | 21 tests passed; modular foundation and compatibility contracts established. |
 | 2 | Persistence and Durable Processing | complete | `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e` | verified on `origin/sih26183/implementation` | 69 managed tables, immutable forensic revisions, durable jobs/outbox, cache isolation, and rebuildable graph projection contract; 35 backend tests pass. |
 | 3 | Identity, Intake, and Case Workflow | complete | `90b9d877ea178b0a642fa60e70afde715252cbe7` | verified on `origin/sih26183/implementation` | Session revocation, agency/case scope, exact intake/report time, immutable corrections, case workflow, audit, and exactly-once initial queueing; 41 backend tests pass. |
-| 4 | Real Blockchain Ingestion | complete | pending | pending | Typed BTC/ETH/TRON/BSC/Polygon adapters, exact normalized persistence, provider provenance, resilient pagination/retry/finality handling, and a scoped durable refresh contract; 50 backend tests pass and one opt-in live smoke test is skipped without credentials. |
+| 4 | Real Blockchain Ingestion | complete | `23b30b21081f21ef51448cae0951180f6d46d92e` | verified on `origin/sih26183/implementation` | Typed BTC/ETH/TRON/BSC/Polygon adapters, exact normalized persistence, provider provenance, resilient pagination/retry/finality handling, and a scoped durable refresh contract; 50 backend tests pass and one opt-in live smoke test is skipped without credentials. |
 | 5 | Tracing and Temporal Transaction Graphs | not_started | pending | pending | Includes Transaction Graph Post-Report Filtering. |
 | 6 | Attribution and Deterministic Analytics | not_started | pending | pending | VASP labels, clustering, typologies, and rule evidence. |
 | 7 | Fresh ML Data and Feature Platform | not_started | pending | pending | Existing backend ML must not be reused. |
@@ -136,7 +136,7 @@ Recorded before implementation:
 | Add scoped durable refresh | done | `POST /api/v1/cases/{case_id}/ingestions` validates case-wallet membership, queues an idempotent `blockchain.ingest` job/outbox request, and audits it. Worker orchestration persists provider evidence or retains retryable error state. |
 | Verify adapters and contracts | done | 50 backend tests pass; Phase 4 fixtures cover EVM/Tron/Bitcoin parsing, exact precision, idempotent persistence, pagination, 429 handling, malformed responses, unavailable credentials, finality, and scoped queueing. The explicit live EVM smoke test is skipped without both `RUN_LIVE_PROVIDER_SMOKE=true` and `ETHERSCAN_API_KEY`. OpenAPI exposes 35 paths including the ingestion contract. |
 | Verify existing frontend remains compatible | done | No frontend source changed. `npm run lint` passed with existing warnings; `npm run build` completed 256 modules with the existing 576.07 kB chunk warning. |
-| Finalize/push Phase 4 | in_progress | Implementation and verification are complete; commit and remote verification remain. |
+| Finalize/push Phase 4 | done | Commit `23b30b21081f21ef51448cae0951180f6d46d92e`, authored by `Ali <alizamir9992@gmail.com>`, was pushed and independently matched with `git ls-remote`. |
 
 ## Requirement Coverage Map
 
@@ -236,6 +236,7 @@ Rules to enforce during ML phases:
 | 2026-09-13 | Revalidated Etherscan V2, TronGrid, and Blockstream Esplora provider contracts against their official documentation | Implemented Etherscan V2 chain-ID paging, TronGrid fingerprints, and Blockstream last-seen transaction paging; no live calls were made during fixture tests. |
 | 2026-09-13 | `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q`; Alembic head; OpenAPI/compile checks | 50 passed, 1 explicit live smoke skipped, and 2 known TestClient/AnyIO deprecation warnings. One migration head remains `20260913_0002`; OpenAPI version `1.4.0-phase4` exposes 35 paths including scoped ingestion. |
 | 2026-09-13 | `npm run lint`; `npm run build` | Lint passed with the same pre-existing warnings. The sandbox blocked Vite subprocess creation; the approved normal-environment build then passed with 256 modules and the unchanged 576.07 kB chunk-size warning. |
+| 2026-09-13 | `git commit -m "Implement SIH26183 Phase 4 blockchain ingestion"`; push and remote SHA check | Created Phase 4 commit `23b30b21081f21ef51448cae0951180f6d46d92e` as `Ali <alizamir9992@gmail.com>` and verified the remote branch resolves to the same SHA. |
 
 ## Phase Completion Log
 
@@ -246,3 +247,4 @@ Rules to enforce during ML phases:
 - 2026-09-12: The user-authorized cleanup removed three superseded tracked planning files in commit `bdd8926` before Phase 2 implementation began.
 - 2026-09-12: Phase 2 completed. The migration chain manages 69 tables, preserves point-in-time forensic data, provides immutable revisions, and adds durable idempotent jobs/outbox, isolated cache keys, and rebuildable graph projection contracts. Commit `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e` was verified on GitHub.
 - 2026-09-13: Phase 3 completed. Session revocation, scoped case access, exact report receipt semantics, atomic idempotent intake, immutable correction/history, canonical lifecycle, encrypted protected fields, and exactly-once durable initial analysis queueing were committed as `90b9d877ea178b0a642fa60e70afde715252cbe7`; completion record `a58b162f720d86a59cff10d239f33aacf72f4678` was pushed and verified on GitHub.
+- 2026-09-13: Phase 4 completed. Real BTC/ETH/TRON/BSC/Polygon provider adapters now retain source provenance, exact native/token amounts, pagination, finality, typed provider failures, and idempotent normalized observations; `23b30b21081f21ef51448cae0951180f6d46d92e` was pushed and verified on GitHub. Live smoke remains explicitly credential-gated.
