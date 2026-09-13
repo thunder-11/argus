@@ -17,6 +17,13 @@ class WalletValidationRequest(BaseModel):
     chain: Chain | None = None
 
 
+class IngestionRequest(BaseModel):
+    address: str = Field(min_length=8, max_length=160)
+    chain: Chain
+    cursor: str | None = Field(default=None, max_length=300)
+    page_size: int | None = Field(default=None, ge=1, le=1000)
+
+
 class SuspectWallet(BaseModel):
     address: str = Field(min_length=3, max_length=160)
     chain: Chain | None = Field(default=None, validation_alias=AliasChoices("chain", "network"))

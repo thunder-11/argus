@@ -4,15 +4,17 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Header, Query, Request, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.providers.registry import provider_capabilities
 from app.core.errors import ApplicationError
 from app.persistence.models import AnalysisRun, BackgroundJob, CaseAccessGrant, CaseAttachment, CaseEvent, CaseNote, ReportEvent
+from app.repositories.phase2 import DurableJobRepository
 from app.repositories.phase3 import WorkflowRepository, canonical_digest
-from app.schemas.phase3 import AttachmentMetadataCreate, CaseAccessGrantCreate, CaseNoteCreate, CaseUpdate, ReportEventCorrection, WalletValidationRequest
+from app.schemas.phase3 import AttachmentMetadataCreate, CaseAccessGrantCreate, CaseNoteCreate, CaseUpdate, IngestionRequest, ReportEventCorrection, WalletValidationRequest
 from app.security.authorization import active_agency_id, get_accessible_case
 from app.security.data_protection import protect
 from app.utils.addresses import validate_wallet
@@ -20,7 +22,7 @@ from app.utils.pagination import PageWindow, page_payload
 from app.utils.timestamps import parse_report_timestamp
 from auth.utils import get_current_user, require_role
 from database import get_db
-from models import Case, User
+from models import Case, CaseWallet, User
 
 
 router = APIRouter(prefix="/api/v1", tags=["Identity and Case Workflow"])
@@ -40,10 +42,38 @@ CANONICAL_TO_LEGACY = {"new": "NEW", "investigating": "UNDER_INVESTIGATION", "es
 @router.get("/chains")
 def chains(request: Request, user: User = Depends(get_current_user)):
     settings = request.app.state.settings
-    readiness = settings.provider_status()
-    return {"items": [{"network": chain, "enabled": True, "provider_status": readiness[chain],
-                       "address_validation": "local", "retrieval": "phase_4_pending"}
-                      for chain in settings.enabled_chains]}
+    return {"items": [{**item, "address_validation": "local", "retrieval": "provider_adapter"}
+                      for item in provider_capabilities(settings)]}
+
+
+@router.post("/cases/{case_id}/ingestions", status_code=status.HTTP_202_ACCEPTED)
+def queue_case_ingestion(case_id: str, payload: IngestionRequest, request: Request,
+                         idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+                         db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Queue a real-provider refresh; no HTTP request fabricates transaction data."""
+    case = get_accessible_case(db, user, case_id, write=True)
+    chain = payload.chain.upper()
+    if chain not in request.app.state.settings.enabled_chains:
+        raise ApplicationError(code="UNSUPPORTED_CHAIN", message="Chain is not enabled", status_code=422,
+                               field_errors={"chain": "unsupported or disabled chain"})
+    case_wallet = db.query(CaseWallet).filter(CaseWallet.case_id == case.id, CaseWallet.wallet_chain == chain,
+                                              CaseWallet.wallet_address == payload.address).first()
+    if case_wallet is None:
+        raise ApplicationError(code="WALLET_NOT_IN_CASE", message="Wallet must be a validated case wallet", status_code=422)
+    key = idempotency_key or f"ingest:{case.id}:{chain}:{payload.address}:{payload.cursor or 'first'}"
+    job, created = DurableJobRepository(db).enqueue_once(
+        operation="blockchain.ingest", idempotency_key=key, case_id=case.id,
+        payload={"case_id": case.id, "chain": chain, "address": payload.address,
+                 "cursor": payload.cursor, "page_size": payload.page_size},
+    )
+    job.actor_id = user.id
+    WorkflowRepository(db).audit(actor_id=user.id, case_id=case.id, action="blockchain.ingest.queue",
+                                 resource_type="background_job", resource_id=job.id,
+                                 details={"chain": chain, "address": payload.address, "cursor": payload.cursor})
+    db.commit()
+    return {"job_id": job.id, "case_id": case.id, "status": job.state,
+            "status_url": f"/api/v1/cases/{case.id}/status", "idempotent_replay": not created,
+            "provider_state": request.app.state.settings.provider_status().get(chain)}
 
 
 @router.post("/wallets/validate")

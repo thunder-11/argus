@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_3_complete`
+Overall status: `phase_4_complete_pending_commit`
 Last updated: 2026-09-13 Asia/Calcutta
-Current objective: Phase 3 is complete; Phase 4 real blockchain ingestion is ready to start.
+Current objective: Phase 4 real blockchain ingestion is implemented and verified; commit and remote verification remain.
 
 ## Phase Tracker
 
@@ -21,7 +21,7 @@ Current objective: Phase 3 is complete; Phase 4 real blockchain ingestion is rea
 | 1 | Modular Backend Foundation and Test Harness | complete | `b7e34adba4d4b962bc368cc1524f9e4cf14cd200` | verified on `origin/sih26183/implementation` | 21 tests passed; modular foundation and compatibility contracts established. |
 | 2 | Persistence and Durable Processing | complete | `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e` | verified on `origin/sih26183/implementation` | 69 managed tables, immutable forensic revisions, durable jobs/outbox, cache isolation, and rebuildable graph projection contract; 35 backend tests pass. |
 | 3 | Identity, Intake, and Case Workflow | complete | `90b9d877ea178b0a642fa60e70afde715252cbe7` | verified on `origin/sih26183/implementation` | Session revocation, agency/case scope, exact intake/report time, immutable corrections, case workflow, audit, and exactly-once initial queueing; 41 backend tests pass. |
-| 4 | Real Blockchain Ingestion | not_started | pending | pending | Requires provider credential placeholders and optional live API keys. |
+| 4 | Real Blockchain Ingestion | complete | pending | pending | Typed BTC/ETH/TRON/BSC/Polygon adapters, exact normalized persistence, provider provenance, resilient pagination/retry/finality handling, and a scoped durable refresh contract; 50 backend tests pass and one opt-in live smoke test is skipped without credentials. |
 | 5 | Tracing and Temporal Transaction Graphs | not_started | pending | pending | Includes Transaction Graph Post-Report Filtering. |
 | 6 | Attribution and Deterministic Analytics | not_started | pending | pending | VASP labels, clustering, typologies, and rule evidence. |
 | 7 | Fresh ML Data and Feature Platform | not_started | pending | pending | Existing backend ML must not be reused. |
@@ -124,14 +124,28 @@ Recorded before implementation:
 | Verify existing frontend remains compatible | done | `npm run lint` exited 0 with the same pre-existing warnings; `npm run build` built 256 modules and exited 0 with the unchanged 576.07 kB chunk-size warning. No frontend source or design changes were made. |
 | Finalize/push Phase 3 | done | Implementation commit `90b9d877ea178b0a642fa60e70afde715252cbe7` and the local completion record `a58b162f720d86a59cff10d239f33aacf72f4678` were pushed and independently matched with `git ls-remote`. |
 
+## Phase 4 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Add typed provider adapter boundary | done | Provider-neutral page, transfer, balance, and normalized-error contracts now support additive adapters without rewriting persistence or orchestration. |
+| Add five-chain retrieval | done | Blockstream Esplora BTC, Etherscan V2 ETH/BSC/Polygon with explicit chain IDs 1/56/137, and TronGrid TRX/TRC-20 adapters retrieve native and token transfers, balance capability, transfer/log indexes, timestamps, block/finality metadata, source URI, and raw-response provenance. |
+| Preserve Bitcoin I/O integrity | done | BTC parsing preserves raw provider payloads and refuses to manufacture output allocations for multi-input transactions; those records are explicitly warned as unallocated pending graph-level handling. |
+| Normalize durable evidence | done | Provider pages are immutable observations keyed by request/response digests; transfer normalization de-duplicates by network/hash/index, preserves raw integer units and `Decimal` amounts, records availability/ingestion/finality, and stores historical native-asset valuation only when the configured real price source returns it. Token symbols never imply a fiat price. |
+| Handle pagination, limits, and failures | done | Etherscan page and TronGrid fingerprint cursors are retained; Blockstream uses last-seen transaction cursors. Transport limits retries to three transient attempts, honors 429 `Retry-After`, and raises typed recoverable errors instead of claiming empty successful history. |
+| Add scoped durable refresh | done | `POST /api/v1/cases/{case_id}/ingestions` validates case-wallet membership, queues an idempotent `blockchain.ingest` job/outbox request, and audits it. Worker orchestration persists provider evidence or retains retryable error state. |
+| Verify adapters and contracts | done | 50 backend tests pass; Phase 4 fixtures cover EVM/Tron/Bitcoin parsing, exact precision, idempotent persistence, pagination, 429 handling, malformed responses, unavailable credentials, finality, and scoped queueing. The explicit live EVM smoke test is skipped without both `RUN_LIVE_PROVIDER_SMOKE=true` and `ETHERSCAN_API_KEY`. OpenAPI exposes 35 paths including the ingestion contract. |
+| Verify existing frontend remains compatible | done | No frontend source changed. `npm run lint` passed with existing warnings; `npm run build` completed 256 modules with the existing 576.07 kB chunk warning. |
+| Finalize/push Phase 4 | in_progress | Implementation and verification are complete; commit and remote verification remain. |
+
 ## Requirement Coverage Map
 
 | PRD Area | Planned Phase(s) | Status |
 | --- | --- | --- |
 | Victim-reported wallet submission and validation | 3 | complete |
-| Multi-blockchain support | 4 | not_started |
-| Real-time blockchain data retrieval | 4, 10 | not_started |
-| Transaction history and normalization | 4, 5 | not_started |
+| Multi-blockchain support | 4 | complete |
+| Real-time blockchain data retrieval | 4, 10 | in_progress |
+| Transaction history and normalization | 4, 5 | in_progress |
 | Wallet/entity relationship analysis | 5, 6 | not_started |
 | Transaction graph generation | 5 | not_started |
 | Transaction Graph Post-Report Filtering | 5 | not_started |
@@ -218,6 +232,10 @@ Rules to enforce during ML phases:
 | 2026-09-13 | `.venv\\Scripts\\python.exe -m pytest -p no:cacheprovider -q` | Final run: 41 passed in 4.06 seconds; only two upstream deprecation warnings remain. |
 | 2026-09-13 | Alembic head/migration tests; PostgreSQL DDL compilation; AST and OpenAPI checks | One head at `20260913_0002`; fresh upgrade/rollback and legacy adoption pass; 72 tables compile; 82 Python files parse; version `1.3.0-phase3` exposes 34 OpenAPI paths and all checked Phase 3 contracts. |
 | 2026-09-13 | `npm ci`; `npm run lint`; `npm run build` | Locked install found no vulnerabilities. Lint exited 0 with pre-existing warnings. Vite built 256 modules; the existing 576.07 kB chunk warning remains. |
+| 2026-09-13 | Re-read `implementation_plan.md`, `phase_0_baseline.md`, complete updated PRD, `progress.md`, and inspected provider, persistence, queue, trace, configuration, and test modules | Confirmed Phase 4-only scope: adapters/provenance/normalization/resilience for BTC, ETH, TRON, BSC, and Polygon. |
+| 2026-09-13 | Revalidated Etherscan V2, TronGrid, and Blockstream Esplora provider contracts against their official documentation | Implemented Etherscan V2 chain-ID paging, TronGrid fingerprints, and Blockstream last-seen transaction paging; no live calls were made during fixture tests. |
+| 2026-09-13 | `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q`; Alembic head; OpenAPI/compile checks | 50 passed, 1 explicit live smoke skipped, and 2 known TestClient/AnyIO deprecation warnings. One migration head remains `20260913_0002`; OpenAPI version `1.4.0-phase4` exposes 35 paths including scoped ingestion. |
+| 2026-09-13 | `npm run lint`; `npm run build` | Lint passed with the same pre-existing warnings. The sandbox blocked Vite subprocess creation; the approved normal-environment build then passed with 256 modules and the unchanged 576.07 kB chunk-size warning. |
 
 ## Phase Completion Log
 

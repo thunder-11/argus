@@ -89,6 +89,15 @@ class Settings:
     job_lease_seconds: int
     job_max_attempts: int
     outbox_batch_size: int
+    provider_connect_timeout_seconds: float
+    provider_request_timeout_seconds: float
+    provider_max_attempts: int
+    provider_page_size: int
+    bitcoin_finality_confirmations: int
+    evm_finality_confirmations: int
+    tron_finality_confirmations: int
+    coingecko_api_key: str
+    coingecko_base_url: str
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> "Settings":
@@ -110,12 +119,19 @@ class Settings:
             job_lease_seconds = int(source.get("JOB_LEASE_SECONDS", "60"))
             job_max_attempts = int(source.get("JOB_MAX_ATTEMPTS", "5"))
             outbox_batch_size = int(source.get("OUTBOX_BATCH_SIZE", "100"))
+            provider_max_attempts = int(source.get("PROVIDER_MAX_ATTEMPTS", "3"))
+            provider_page_size = int(source.get("PROVIDER_PAGE_SIZE", "100"))
+            bitcoin_finality = int(source.get("BITCOIN_FINALITY_CONFIRMATIONS", "6"))
+            evm_finality = int(source.get("EVM_FINALITY_CONFIRMATIONS", "12"))
+            tron_finality = int(source.get("TRON_FINALITY_CONFIRMATIONS", "19"))
+            provider_connect_timeout = float(source.get("PROVIDER_CONNECT_TIMEOUT_SECONDS", "3"))
+            provider_request_timeout = float(source.get("PROVIDER_REQUEST_TIMEOUT_SECONDS", "10"))
         except ValueError as exc:
             raise ConfigurationError([f"Invalid numeric configuration: {exc}"]) from exc
 
         return cls(
             app_env=app_env,
-            app_version=source.get("APP_VERSION", "1.3.0-phase3"),
+            app_version=source.get("APP_VERSION", "1.4.0-phase4"),
             log_level=source.get("LOG_LEVEL", "INFO").upper(),
             database_url=source.get("DATABASE_URL", "sqlite:///./cfas.db"),
             jwt_secret_key=source.get("JWT_SECRET_KEY", source.get("SECRET_KEY", DEVELOPMENT_SECRET)),
@@ -159,6 +175,15 @@ class Settings:
             job_lease_seconds=job_lease_seconds,
             job_max_attempts=job_max_attempts,
             outbox_batch_size=outbox_batch_size,
+            provider_connect_timeout_seconds=provider_connect_timeout,
+            provider_request_timeout_seconds=provider_request_timeout,
+            provider_max_attempts=provider_max_attempts,
+            provider_page_size=provider_page_size,
+            bitcoin_finality_confirmations=bitcoin_finality,
+            evm_finality_confirmations=evm_finality,
+            tron_finality_confirmations=tron_finality,
+            coingecko_api_key=source.get("COINGECKO_API_KEY", ""),
+            coingecko_base_url=source.get("COINGECKO_BASE_URL", "https://api.coingecko.com/api/v3"),
         )
 
     @property
@@ -203,6 +228,16 @@ class Settings:
             errors.append("REPORT_TIME_MAX_FUTURE_SKEW_SECONDS cannot be negative")
         if self.job_lease_seconds <= 0 or self.job_max_attempts <= 0 or self.outbox_batch_size <= 0:
             errors.append("JOB_LEASE_SECONDS, JOB_MAX_ATTEMPTS, and OUTBOX_BATCH_SIZE must be positive")
+        if not 1 <= self.provider_max_attempts <= 3:
+            errors.append("PROVIDER_MAX_ATTEMPTS must be between 1 and 3")
+        if not 1 <= self.provider_page_size <= 1000:
+            errors.append("PROVIDER_PAGE_SIZE must be between 1 and 1000")
+        if self.provider_connect_timeout_seconds <= 0 or self.provider_request_timeout_seconds <= 0:
+            errors.append("Provider timeouts must be positive")
+        if self.provider_connect_timeout_seconds > self.provider_request_timeout_seconds:
+            errors.append("PROVIDER_CONNECT_TIMEOUT_SECONDS cannot exceed PROVIDER_REQUEST_TIMEOUT_SECONDS")
+        if min(self.bitcoin_finality_confirmations, self.evm_finality_confirmations, self.tron_finality_confirmations) < 1:
+            errors.append("Network finality confirmation thresholds must be positive")
         if self.data_mode == "fixture" and not self.demo_enabled:
             errors.append("DATA_MODE=fixture requires DEMO_ENABLED=true")
         if self.data_mode == "live" and self.demo_enabled:

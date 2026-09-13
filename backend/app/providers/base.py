@@ -1,4 +1,4 @@
-"""Provider contract that new blockchain integrations must implement."""
+"""Legacy async provider contract retained for existing integration boundaries."""
 
 from abc import ABC, abstractmethod
 from typing import Any
@@ -13,5 +13,5 @@ class BlockchainProvider(ABC):
         """Return a provider page with raw records, provenance, and next cursor."""
 
     @abstractmethod
-    async def health(self) -> dict[str, Any]:
+    def health(self) -> dict[str, object]:
         """Return configuration and readiness without exposing credentials."""
