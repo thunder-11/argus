@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_5_complete`
+Overall status: `phase_6_complete`
 Last updated: 2026-09-13 Asia/Calcutta
-Current objective: Phase 5 is complete; Phase 6 attribution and deterministic analytics are ready to start.
+Current objective: Phase 6 is complete; Phase 7 fresh ML data and feature platform work is ready to start under the strict non-reuse boundary.
 
 ## Phase Tracker
 
@@ -23,7 +23,7 @@ Current objective: Phase 5 is complete; Phase 6 attribution and deterministic an
 | 3 | Identity, Intake, and Case Workflow | complete | `90b9d877ea178b0a642fa60e70afde715252cbe7` | verified on `origin/sih26183/implementation` | Session revocation, agency/case scope, exact intake/report time, immutable corrections, case workflow, audit, and exactly-once initial queueing; 41 backend tests pass. |
 | 4 | Real Blockchain Ingestion | complete | `23b30b21081f21ef51448cae0951180f6d46d92e` | verified on `origin/sih26183/implementation` | Typed BTC/ETH/TRON/BSC/Polygon adapters, exact normalized persistence, provider provenance, resilient pagination/retry/finality handling, and a scoped durable refresh contract; 50 backend tests pass and one opt-in live smoke test is skipped without credentials. |
 | 5 | Tracing and Temporal Transaction Graphs | complete | `dc317a3576f96a93ef14270d3f84dae5d2180850` | verified on `origin/sih26183/implementation` | Bounded evidence paths, immutable graph snapshots, report-event time partitions, side-effect-free graph queries, cursors, and visualization-only live trails are implemented. |
-| 6 | Attribution and Deterministic Analytics | not_started | pending | pending | VASP labels, clustering, typologies, and rule evidence. |
+| 6 | Attribution and Deterministic Analytics | complete | `a42dc1e` | local; push awaiting explicit authorization | Reviewed point-in-time labels, conservative nearest-VASP attribution, privacy boundaries, cluster false-positive controls, qualified cross-victim correlation, and versioned rule evidence are implemented. |
 | 7 | Fresh ML Data and Feature Platform | not_started | pending | pending | Existing backend ML must not be reused. |
 | 8 | Fresh ML Training, Validation, and Evaluation | not_started | pending | pending | Promotion depends on measurable PRD quality gates. |
 | 9 | ML Inference, Explainability, and Human Review | not_started | pending | pending | Decision support only, with analyst override. |
@@ -152,6 +152,21 @@ Recorded before implementation:
 | Verify frontend compatibility | done | No frontend source changed; lint and production build pass with the recorded baseline warnings. |
 | Finalize/push Phase 5 | done | Implementation commit `dc317a3576f96a93ef14270d3f84dae5d2180850` and progress commit `1570ca6e9abc81108d6923e6a91b3a24b0f2fe7d` were pushed and independently verified. |
 
+## Phase 6 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Govern sourced directory labels | done | Admin-only imports validate network-qualified addresses and retain source/evidence URI, effective dates, review state/reviewer, knowledge time, FIU status provenance, and contact provenance. Unreviewed and expired labels are excluded from attribution. |
+| Attribute nearest supported VASP | done | Run-cutoff traversal stops each branch at the first reviewed VASP label, ranks nearest paths deterministically, and keeps exact 95 and qualifying same-asset six-hour sweep 85 as explicit heuristic confidence rather than ML probability. |
+| Enforce privacy and cross-chain boundaries | done | Mixer/bridge/swap entries produce unresolved boundary findings; no exit or destination is inferred from time/amount similarity and no synthetic continuation is created. |
+| Expose conservative clusters | done | Only clusters intersecting the selected run are returned with version, evidence, confidence, an explicit no-ownership claim, and public-service false-positive controls. |
+| Add deterministic pattern evidence | done | The independent `prd-six-factor-v1` policy persists append-only findings for mixer, bridge/swap, 60-minute velocity, repeated peeling, evidenced-new-wallet, and distinct-victim complaint linkage; extra rapid-dispersal, fan-in/fan-out, consolidation, and path-depth tags do not silently change weights. |
+| Qualify cross-victim correlation | done | Agency-scoped correlation requires at least three distinct complaints and victims, excludes reviewed public-service-only matches, and returns analyst-review language rather than categorical fraud certainty. |
+| Add read and materialization APIs | done | Authenticated entity, attribution, cluster, correlation, and risk reads remain side-effect free; `POST /cases/{id}/analytics` idempotently materializes immutable rule/risk results. OpenAPI exposes 45 paths. |
+| Add Phase 6 migration and documentation | done | Alembic head `20260913_0003` adds directory legal/service/FIU/contact provenance and assertion review metadata; `ANALYTICS.md` documents confidence separation and boundaries. |
+| Verify Phase 6 | done | 56 backend tests passed, one explicit live-provider smoke test was skipped without credentials, Python compilation and `pip check` passed, and frontend lint/build passed with the unchanged recorded warnings. |
+| Finalize/push Phase 6 | partial | The implementation and completion record exist in local commits; publishing to the external GitHub remote awaits explicit user authorization. |
+
 ## Requirement Coverage Map
 
 | PRD Area | Planned Phase(s) | Status |
@@ -160,12 +175,12 @@ Recorded before implementation:
 | Multi-blockchain support | 4 | complete |
 | Real-time blockchain data retrieval | 4, 10 | in_progress |
 | Transaction history and normalization | 4, 5 | complete |
-| Wallet/entity relationship analysis | 5, 6 | in_progress |
+| Wallet/entity relationship analysis | 5, 6 | complete |
 | Transaction graph generation | 5 | complete |
 | Transaction Graph Post-Report Filtering | 5 | complete |
-| Cryptocurrency exchange/VASP identification | 6 | not_started |
-| Fraud and suspicious-activity detection | 6, 9 | not_started |
-| Risk scoring, confidence, and explainable indicators | 6, 9 | not_started |
+| Cryptocurrency exchange/VASP identification | 6 | complete |
+| Fraud and suspicious-activity detection | 6, 9 | in_progress |
+| Risk scoring, confidence, and explainable indicators | 6, 9 | in_progress |
 | Investigation and case management | 3, 11 | in_progress |
 | Real-time analysis status/progress | 10 | not_started |
 | Alerts and notifications | 10 | not_started |
@@ -256,6 +271,10 @@ Rules to enforce during ML phases:
 | 2026-09-13 | `npm run lint`; `npm run build` | Lint passed with the existing frontend warnings. The sandbox could not spawn Vite's child process; the approved normal-environment build completed 256 modules with the unchanged 576.07 kB chunk-size warning. No frontend source changed. |
 | 2026-09-13 | `git commit -m "Implement SIH26183 Phase 5 temporal graphs"` | Created Phase 5 implementation commit `dc317a3576f96a93ef14270d3f84dae5d2180850` as `Ali <alizamir9992@gmail.com>`. |
 | 2026-09-13 | `git push origin sih26183/implementation`; `git ls-remote origin refs/heads/sih26183/implementation` | Pushed Phase 5 and verified the remote branch at progress commit `1570ca6e9abc81108d6923e6a91b3a24b0f2fe7d`. |
+| 2026-09-13 | Read the Phase 6 plan and PRD attribution, correlation, graph-boundary, deterministic-risk, entity API, and acceptance requirements; inspected current normalized evidence and persistence contracts | Restricted implementation to evidence-backed deterministic Phase 6 behavior and preserved the fresh-ML non-reuse boundary. |
+| 2026-09-13 | `python -m pytest -p no:cacheprovider -q`; Alembic head; Python compile, OpenAPI and dependency checks | 56 tests passed, one credential-gated live smoke skipped, one known TestClient warning remains; migration head is `20260913_0003`, application version is `1.6.0-phase6`, and OpenAPI exposes 45 paths. |
+| 2026-09-13 | `npm run lint`; `npm run build` | Both exited 0 without frontend source changes; the pre-existing lint findings and 576.07 kB chunk warning remain. |
+| 2026-09-13 | `git commit -m "Implement SIH26183 Phase 6 deterministic analytics"` | Created implementation commit `a42dc1e`, authored by `Ali <alizamir9992@gmail.com>`. |
 
 ## Phase Completion Log
 
@@ -267,3 +286,5 @@ Rules to enforce during ML phases:
 - 2026-09-12: Phase 2 completed. The migration chain manages 69 tables, preserves point-in-time forensic data, provides immutable revisions, and adds durable idempotent jobs/outbox, isolated cache keys, and rebuildable graph projection contracts. Commit `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e` was verified on GitHub.
 - 2026-09-13: Phase 3 completed. Session revocation, scoped case access, exact report receipt semantics, atomic idempotent intake, immutable correction/history, canonical lifecycle, encrypted protected fields, and exactly-once durable initial analysis queueing were committed as `90b9d877ea178b0a642fa60e70afde715252cbe7`; completion record `a58b162f720d86a59cff10d239f33aacf72f4678` was pushed and verified on GitHub.
 - 2026-09-13: Phase 4 completed. Real BTC/ETH/TRON/BSC/Polygon provider adapters now retain source provenance, exact native/token amounts, pagination, finality, typed provider failures, and idempotent normalized observations; `23b30b21081f21ef51448cae0951180f6d46d92e` was pushed and verified on GitHub. Live smoke remains explicitly credential-gated.
+- 2026-09-13: Phase 5 completed. Bounded evidence paths, immutable temporal graphs, exact report-time partitions, separate context, filter-bound reads, and visualization-only live trails were committed as `dc317a3576f96a93ef14270d3f84dae5d2180850` and verified on GitHub.
+- 2026-09-13: Phase 6 completed locally. Reviewed point-in-time VASP labels, conservative exact/sweep attribution, mixer/bridge boundaries, cluster false-positive controls, qualified distinct-victim correlation, and the explainable `prd-six-factor-v1` composite were committed as `a42dc1e`; 56 backend tests pass and the existing frontend remains compatible. External push is pending explicit authorization.
