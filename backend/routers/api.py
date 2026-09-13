@@ -14,7 +14,8 @@ from models import (
 from auth.utils import get_current_user, require_role
 from app.utils.pagination import PageWindow, page_payload
 from app.security.authorization import accessible_case_query, get_accessible_case
-from app.persistence.models import CaseComplaint, ComplaintRecord, Victim
+from app.persistence.models import CaseComplaint, ComplaintRecord, EvidenceManifest, ReportEvent, ReportRevision, Victim
+from app.repositories.phase3 import WorkflowRepository, canonical_digest
 from app.security.data_protection import unprotect
 from services.report_generator import generate_freeze_notice, generate_forensic_report
 from services.correlation import find_linked_cases
@@ -312,7 +313,7 @@ def gen_freeze_notice(case_id: str, req: FreezeNoticeRequest, db: Session = Depe
         "amount": float(last_tx.amount) if last_tx else 0,
         "chain": terminal.wallet_chain if terminal else "N/A",
         "timestamp": last_tx.timestamp.isoformat() if last_tx and last_tx.timestamp else "N/A",
-        "confidence": 96.0,
+        "confidence": None,
     }
 
     officer_info = {
@@ -448,11 +449,37 @@ def gen_court_report(case_id: str, db: Session = Depends(get_db), user: User = D
     report = ForensicReport(
         case_id=case_id,
         report_reference_number=result["report_reference"],
-        sha256_content_hash=result["sha256_content_hash"],
+        sha256_content_hash=result["sha256_pdf_hash"],
         generated_by=user.id,
         pdf_storage_path=result["pdf_path"],
+        is_court_certified=False,
     )
     db.add(report)
+    db.flush()
+    report_event = db.query(ReportEvent).filter(ReportEvent.id == case.primary_report_event_id).first()
+    cutoff = report_event.report_timestamp if report_event else datetime.now(timezone.utc)
+    manifest = {
+        "case_id": case.id, "report_id": report.id, "report_event_id": report_event.id if report_event else None,
+        "content_digest": result["sha256_content_hash"], "pdf_digest": result["sha256_pdf_hash"],
+        "report_event_revision": report_event.revision if report_event else None,
+        "report_cutoff": cutoff.isoformat(), "pre_report_context": "retained_separately",
+        "post_report_activity": "strictly_after_selected_report_cutoff", "transaction_count": len(edges),
+        "source_references": sorted({tx.tx_hash for tx in txs}), "graph_snapshot_id": None,
+        "risk_result_id": None, "ml_prediction_id": None,
+        "limitations": ["Legacy-compatible immediate generation", "Human review and signature required"],
+    }
+    evidence_revision = (db.query(func.coalesce(func.max(EvidenceManifest.revision), 0))
+                         .filter(EvidenceManifest.case_id == case.id).scalar() + 1)
+    evidence_manifest = EvidenceManifest(case_id=case.id, revision=evidence_revision, object_ids=[],
+                                         manifest_hash=canonical_digest(manifest))
+    db.add(evidence_manifest); db.flush()
+    revision = ReportRevision(report_id=report.id, revision=1, case_id=case.id, evidence_manifest={**manifest, "manifest_id": evidence_manifest.id},
+        content_digest=result["sha256_content_hash"], pdf_digest=result["sha256_pdf_hash"], storage_uri=result["pdf_path"],
+        report_cutoff=cutoff, review_status="draft", dispatch_status="not_dispatched", created_by=user.id)
+    db.add(revision)
+    db.flush()
+    WorkflowRepository(db).audit(actor_id=user.id, case_id=case.id, action="report.generate", resource_type="report_revision",
+                                 resource_id=revision.id, details={"manifest_hash": evidence_manifest.manifest_hash})
     db.commit()
 
     pdf_b64 = base64.b64encode(result["pdf_bytes"]).decode()
@@ -460,8 +487,10 @@ def gen_court_report(case_id: str, db: Session = Depends(get_db), user: User = D
     return {
         "report_id": report.id,
         "report_reference": result["report_reference"],
-        "sha256_hash": result["sha256_content_hash"],
-        "legal_admissibility": "Certified under Section 63 of Bharatiya Sakshya Adhiniyam, 2023",
+        "sha256_hash": result["sha256_pdf_hash"],
+        "legal_admissibility": "Draft evidence report; human completion, review, and signature are required",
+        "is_court_certified": False,
+        "manifest_hash": evidence_manifest.manifest_hash,
         "pdf_base64": pdf_b64,
         "pdf_filename": result["pdf_filename"],
     }

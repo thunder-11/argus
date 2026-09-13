@@ -86,7 +86,7 @@ def generate_freeze_notice(
         f"cyber fraud / cheating under Sections 318(4), 319(2) of Bharatiya Nyaya Sanhita, 2023 and Section 66D of "
         f"Information Technology Act, 2000;", body_style))
     elements.append(Paragraph(
-        f"And whereas during the course of investigation, it has been established through blockchain forensic analysis "
+        f"And whereas blockchain analysis indicates, subject to investigator review and the limitations in the evidence manifest, "
         f"that the proceeds of crime amounting to <b>{case_data.get('reported_loss_amount', 0):,.2f} {case_data.get('loss_currency', 'USDT')}</b> "
         f"were transferred by the victim to suspect cryptocurrency wallet addresses, and subsequently traced to a deposit "
         f"address associated with your platform;", body_style))
@@ -102,7 +102,7 @@ def generate_freeze_notice(
         ["Amount", f"{trace_data.get('amount', 0):,.2f} {case_data.get('loss_currency', 'USDT')}"],
         ["Blockchain", trace_data.get("chain", "N/A")],
         ["Timestamp (UTC)", trace_data.get("timestamp", "N/A")],
-        ["Attribution Confidence", f"{trace_data.get('confidence', 0)}%"],
+        ["Attribution Confidence", "Not independently established" if trace_data.get("confidence") is None else f"{trace_data['confidence']}%"],
     ]
     table = Table(evidence_data, colWidths=[160, 300])
     table.setStyle(TableStyle([
@@ -205,7 +205,7 @@ def generate_forensic_report(
     # Title
     elements.append(Paragraph("CRYPTO FRAUD ATTRIBUTION SYSTEM (CFAS)", title_style))
     elements.append(Paragraph("BLOCKCHAIN FORENSIC INVESTIGATION REPORT", ParagraphStyle("t2", parent=title_style, fontSize=13, textColor=colors.HexColor("#c0392b"))))
-    elements.append(Paragraph(f"Certified under Section 63 of Bharatiya Sakshya Adhiniyam, 2023", subtitle_style))
+    elements.append(Paragraph("Draft evidence report — Section 63 certificate requires human completion and signature", subtitle_style))
     elements.append(HRFlowable(width="100%", color=colors.HexColor("#0052FF"), thickness=2))
     elements.append(Spacer(1, 10))
 
@@ -324,10 +324,9 @@ def generate_forensic_report(
     elements.append(Paragraph("CERTIFICATE UNDER SECTION 63 OF BHARATIYA SAKSHYA ADHINIYAM, 2023", ParagraphStyle("cert", parent=title_style, fontSize=12, textColor=colors.HexColor("#c0392b"))))
     elements.append(Spacer(1, 6))
     elements.append(Paragraph(
-        "I hereby certify that the electronic record contained in this report is an accurate reproduction "
-        "of the blockchain transaction data retrieved through automated API queries to public blockchain "
-        "explorers (TronGrid, Etherscan, BscScan, Blockstream) and processed by the CFAS attribution engine. "
-        "The integrity of this document is secured by the following cryptographic hash:", body_style))
+        "Template for completion by an authorized human signatory. The signer must verify the source manifest, "
+        "retrieval process, system particulars, and reproduction accuracy before making any Section 63 statement. "
+        "A cryptographic hash establishes file integrity only; it does not establish admissibility:", body_style))
     elements.append(Spacer(1, 6))
 
     hash_data = [
@@ -351,12 +350,14 @@ def generate_forensic_report(
     doc.build(elements)
 
     pdf_bytes = buffer.getvalue()
+    pdf_hash = hashlib.sha256(pdf_bytes).hexdigest()
     with open(filepath, "wb") as f:
         f.write(pdf_bytes)
 
     return {
         "report_reference": ref_number,
         "sha256_content_hash": content_hash,
+        "sha256_pdf_hash": pdf_hash,
         "pdf_path": filepath,
         "pdf_filename": filename,
         "pdf_bytes": pdf_bytes,
