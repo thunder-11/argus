@@ -1,23 +1,26 @@
 """Trace execution & graph data routers."""
-import time
+import base64
+import hashlib
+import json
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Header, HTTPException
+from dataclasses import asdict
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Case, CaseWallet, Alert, User, Transaction, Wallet
+from models import CaseWallet, Alert, User
 from auth.utils import get_current_user
-from services.tracer import execute_trace
 from services.risk_scoring import compute_risk_score
 from services.correlation import find_linked_cases
 from config import DEFAULT_MAX_HOPS
 from app.core.errors import ApplicationError
 from app.jobs.contracts import JobState
-from app.persistence.models import AddressRecord, AnalysisRun, ReportEvent
+from app.persistence.models import AddressRecord, AnalysisRun, ReportEvent, TracePath
 from app.repositories.phase2 import DurableJobRepository
 from app.repositories.phase3 import WorkflowRepository
 from app.security.authorization import get_accessible_case
+from app.services.temporal_graph import GraphRequest, graph_payload
 
 router = APIRouter(prefix="/api/v1/cases", tags=["Traces"])
 
@@ -94,88 +97,87 @@ def _job_id(db: Session, case_id: str) -> str | None:
     return job.id if job else None
 
 
+def _graph_request(*, temporal_view: str, boundary: str, include_context: bool, chain: str | None, asset: str | None,
+                   min_amount: str | None, max_amount: str | None, to_time: datetime | None, trace_id: str | None,
+                   report_event_id: str | None, report_revision: int | None) -> GraphRequest:
+    if to_time and to_time.tzinfo is None:
+        raise ApplicationError(code="INVALID_TIMESTAMP", message="The end time must include a timezone offset", status_code=422)
+    return GraphRequest(temporal_view=temporal_view, boundary=boundary, include_context=include_context, chain=chain,
+                        asset=asset, min_amount=min_amount, max_amount=max_amount, to_time=to_time, trace_id=trace_id,
+                        report_event_id=report_event_id, report_revision=report_revision)
+
+
 @router.get("/{case_id}/graph")
-def get_case_graph(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Get the visualization graph data for a case."""
+def get_case_graph(case_id: str, temporal_view: str = Query("all", alias="temporal_view"), boundary: str = "exclusive",
+                   include_context: bool = False, chain: str | None = None, asset: str | None = None,
+                   min_amount: str | None = None, max_amount: str | None = None, to_time: datetime | None = Query(None, alias="to"),
+                   trace_id: str | None = None, report_event_id: str | None = None, report_revision: int | None = None,
+                   db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Read a bounded temporal graph.  GET requests never start or recompute a trace."""
     case = get_accessible_case(db, user, case_id)
+    return graph_payload(case, _graph_request(temporal_view=temporal_view, boundary=boundary, include_context=include_context,
+                                               chain=chain, asset=asset, min_amount=min_amount, max_amount=max_amount,
+                                               to_time=to_time, trace_id=trace_id, report_event_id=report_event_id,
+                                               report_revision=report_revision), db)
 
-    case_wallets = db.query(CaseWallet).filter_by(case_id=case_id).order_by(CaseWallet.hop_depth).all()
 
-    # If case only has origin wallet, auto-execute trace to populate graph
-    if len(case_wallets) <= 1:
-        origin = db.query(CaseWallet).filter_by(case_id=case_id, is_origin_reported=True).first()
-        if origin:
-            try:
-                execute_trace(
-                    start_address=origin.wallet_address,
-                    chain=origin.wallet_chain,
-                    case_id=case_id,
-                    db=db,
-                    incident_timestamp=case.incident_timestamp,
-                )
-                db.commit()
-                case_wallets = db.query(CaseWallet).filter_by(case_id=case_id).order_by(CaseWallet.hop_depth).all()
-            except Exception as e:
-                print(f"[TRACE ERROR] Auto trace failed for {case_id}: {e}")
+@router.get("/{case_id}/transactions")
+def get_case_transactions(case_id: str, temporal_view: str = "all", boundary: str = "exclusive", include_context: bool = False,
+                          chain: str | None = None, asset: str | None = None, min_amount: str | None = None, max_amount: str | None = None,
+                          to_time: datetime | None = Query(None, alias="to"), trace_id: str | None = None,
+                          report_event_id: str | None = None, report_revision: int | None = None, limit: int = Query(50, ge=1, le=100),
+                          cursor: str | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    case = get_accessible_case(db, user, case_id)
+    request = _graph_request(temporal_view=temporal_view, boundary=boundary, include_context=include_context, chain=chain, asset=asset,
+                             min_amount=min_amount, max_amount=max_amount, to_time=to_time, trace_id=trace_id,
+                             report_event_id=report_event_id, report_revision=report_revision)
+    graph = graph_payload(case, request, db)
+    fingerprint = hashlib.sha256(json.dumps({"case": case.id, "request": asdict(request)}, default=str, sort_keys=True).encode()).hexdigest()
+    offset = 0
+    if cursor:
+        try:
+            decoded = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
+            if decoded["fingerprint"] != fingerprint or not isinstance(decoded["offset"], int):
+                raise ValueError
+            offset = decoded["offset"]
+        except Exception as exc:
+            raise ApplicationError(code="INVALID_CURSOR", message="Cursor does not match this graph query", status_code=400) from exc
+    values = graph["edges"]
+    items = values[offset:offset + limit]
+    next_cursor = None
+    if offset + limit < len(values):
+        next_cursor = base64.urlsafe_b64encode(json.dumps({"fingerprint": fingerprint, "offset": offset + limit}).encode()).decode()
+    return {"case_id": case.id, "trace_id": graph["trace_id"], "items": items, "transactions": items, "total": len(values),
+            "next_cursor": next_cursor, "summary": graph["summary"], "context_transfer_count": len(graph["context_edges"])}
 
-    nodes = []
-    edges = []
 
-    COLOR_MAP = {
-        "ORIGIN_VICTIM": "#0052FF",
-        "MULE_LAYER": "#8E8E93",
-        "MIXER": "#FF3B30",
-        "BRIDGE": "#FF9500",
-        "VASP_DEPOSIT": "#30D158",
-        "VASP_HOT_WALLET": "#34C759",
-        "NORMAL_WALLET": "#8E8E93",
-    }
+@router.get("/{case_id}/graph/live-trail")
+def live_transaction_trail(case_id: str, trace_id: str | None = None, report_event_id: str | None = None,
+                           report_revision: int | None = None, boundary: str = "exclusive", db: Session = Depends(get_db),
+                           user: User = Depends(get_current_user)):
+    """Visualization-only ordered transfer trail; it has no persisted playback state."""
+    case = get_accessible_case(db, user, case_id)
+    graph = graph_payload(case, GraphRequest(temporal_view="post_report", boundary=boundary, trace_id=trace_id,
+                                               report_event_id=report_event_id, report_revision=report_revision), db)
+    steps = sorted(graph["edges"], key=lambda edge: (edge["event_time"], edge["hop"], edge["id"]))
+    return {"case_id": case.id, "trace_id": graph["trace_id"], "visualization_only": True,
+            "controls": ["play", "pause", "step_forward", "step_back", "restart", "speed"], "steps": steps,
+            "stats": graph["summary"], "context_excluded": True}
 
-    wallet_addrs = set()
-    for cw in case_wallets:
-        wallet = db.query(Wallet).filter_by(address=cw.wallet_address, chain=cw.wallet_chain).first()
-        node_type = wallet.node_type if wallet else "NORMAL_WALLET"
-        node = {
-            "id": cw.wallet_address,
-            "label": _get_label(wallet, db),
-            "chain": cw.wallet_chain,
-            "node_type": node_type,
-            "hop": cw.hop_depth,
-            "color": COLOR_MAP.get(node_type, "#8E8E93"),
-        }
-        if wallet and wallet.vasp_id:
-            from models import VaspDirectory
-            vasp = db.query(VaspDirectory).filter_by(id=wallet.vasp_id).first()
-            if vasp:
-                node["vasp_name"] = vasp.vasp_name
-                node["is_fiu_registered"] = vasp.is_fiu_ind_registered
-                node["nodal_email"] = vasp.nodal_officer_email
-        nodes.append(node)
-        wallet_addrs.add(cw.wallet_address)
 
-    # Get transactions between case wallets
-    for addr in wallet_addrs:
-        txs = db.query(Transaction).filter(
-            Transaction.from_address == addr,
-            Transaction.to_address.in_(wallet_addrs),
-        ).all()
-        for tx in txs:
-            edges.append({
-                "id": f"e-{tx.tx_hash[:16]}",
-                "source": tx.from_address,
-                "target": tx.to_address,
-                "amount": float(tx.amount),
-                "token": tx.token_symbol,
-                "tx_hash": tx.tx_hash,
-                "timestamp": tx.timestamp.isoformat() if tx.timestamp else "",
-                "is_peeling": tx.is_peeling_tx,
-            })
+trace_read_router = APIRouter(prefix="/api/v1/traces", tags=["Traces"])
 
-    return {
-        "case_id": case_id,
-        "nodes": nodes,
-        "edges": edges,
-    }
+
+@trace_read_router.get("/{trace_id}/paths")
+def get_trace_paths(trace_id: str, case_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Return immutable, ordered trace paths without rebuilding a graph."""
+    case = get_accessible_case(db, user, case_id)
+    run = db.get(AnalysisRun, trace_id)
+    if run is None or run.case_id != case.id:
+        raise ApplicationError(code="TRACE_NOT_FOUND", message="Trace run not found for case", status_code=404)
+    paths = db.query(TracePath).filter(TracePath.run_id == run.id).order_by(TracePath.path_index).all()
+    return {"case_id": case.id, "trace_id": run.id, "items": [{"path_index": path.path_index, "hop_count": path.hop_count,
+             "path": path.path_payload, "evidence_digest": path.evidence_digest} for path in paths], "total": len(paths), "read_only": True}
 
 
 @router.get("/{case_id}/related")

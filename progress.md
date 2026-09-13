@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_4_complete`
+Overall status: `phase_5_complete`
 Last updated: 2026-09-13 Asia/Calcutta
-Current objective: Phase 4 is complete; Phase 5 tracing and temporal transaction graphs are ready to start.
+Current objective: Phase 5 is complete; Phase 6 attribution and deterministic analytics are ready to start.
 
 ## Phase Tracker
 
@@ -22,7 +22,7 @@ Current objective: Phase 4 is complete; Phase 5 tracing and temporal transaction
 | 2 | Persistence and Durable Processing | complete | `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e` | verified on `origin/sih26183/implementation` | 69 managed tables, immutable forensic revisions, durable jobs/outbox, cache isolation, and rebuildable graph projection contract; 35 backend tests pass. |
 | 3 | Identity, Intake, and Case Workflow | complete | `90b9d877ea178b0a642fa60e70afde715252cbe7` | verified on `origin/sih26183/implementation` | Session revocation, agency/case scope, exact intake/report time, immutable corrections, case workflow, audit, and exactly-once initial queueing; 41 backend tests pass. |
 | 4 | Real Blockchain Ingestion | complete | `23b30b21081f21ef51448cae0951180f6d46d92e` | verified on `origin/sih26183/implementation` | Typed BTC/ETH/TRON/BSC/Polygon adapters, exact normalized persistence, provider provenance, resilient pagination/retry/finality handling, and a scoped durable refresh contract; 50 backend tests pass and one opt-in live smoke test is skipped without credentials. |
-| 5 | Tracing and Temporal Transaction Graphs | not_started | pending | pending | Includes Transaction Graph Post-Report Filtering. |
+| 5 | Tracing and Temporal Transaction Graphs | complete | pending | pending | Bounded evidence paths, immutable graph snapshots, report-event time partitions, side-effect-free graph queries, cursors, and visualization-only live trails are implemented. |
 | 6 | Attribution and Deterministic Analytics | not_started | pending | pending | VASP labels, clustering, typologies, and rule evidence. |
 | 7 | Fresh ML Data and Feature Platform | not_started | pending | pending | Existing backend ML must not be reused. |
 | 8 | Fresh ML Training, Validation, and Evaluation | not_started | pending | pending | Promotion depends on measurable PRD quality gates. |
@@ -138,6 +138,20 @@ Recorded before implementation:
 | Verify existing frontend remains compatible | done | No frontend source changed. `npm run lint` passed with existing warnings; `npm run build` completed 256 modules with the existing 576.07 kB chunk warning. |
 | Finalize/push Phase 4 | done | Commit `23b30b21081f21ef51448cae0951180f6d46d92e`, authored by `Ali <alizamir9992@gmail.com>`, was pushed and independently matched with `git ls-remote`. |
 
+## Phase 5 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Build bounded evidence paths | done | Outgoing normalized-transfer traversal is rooted in the selected immutable run, defaults to its four-hop setting, and supports the validated six-hop maximum. |
+| Persist forensic graph artifacts | done | `materialize_trace_graph` writes immutable `TracePath` records and an idempotent `GraphSnapshot`; normalized transfers and analysis runs remain the authoritative evidence. |
+| Apply exact report-time filtering | done | Selected report events provide T0 with no created-at fallback. Pre-report is `< T0`; post-report is `> T0` by default or `>= T0` with `boundary=inclusive`; boundary and unknown counts remain explicit. |
+| Keep context separate | done | Optional context is returned in distinct nodes/edges with `context_only`; it is excluded from selected amounts, counts, and live-trail playback. |
+| Add read-only graph interfaces | done | Authenticated graph, transaction cursor, path, and live-trail endpoints are case/run/report scoped. Graph GET never fetches a provider, queues a job, or mutates evidence. |
+| Preserve decision state | done | The live trail only returns ordered actual transfers and client controls; it creates no playback state and does not alter cases, risk, ML, or investigations. |
+| Verify Phase 5 | done | 52 backend tests pass, one deliberately gated provider smoke test is skipped, and OpenAPI contains all four Phase 5 read contracts. |
+| Verify frontend compatibility | done | No frontend source changed; lint and production build pass with the recorded baseline warnings. |
+| Finalize/push Phase 5 | pending | Commit and independent remote verification will be recorded after push. |
+
 ## Requirement Coverage Map
 
 | PRD Area | Planned Phase(s) | Status |
@@ -145,10 +159,10 @@ Recorded before implementation:
 | Victim-reported wallet submission and validation | 3 | complete |
 | Multi-blockchain support | 4 | complete |
 | Real-time blockchain data retrieval | 4, 10 | in_progress |
-| Transaction history and normalization | 4, 5 | in_progress |
-| Wallet/entity relationship analysis | 5, 6 | not_started |
-| Transaction graph generation | 5 | not_started |
-| Transaction Graph Post-Report Filtering | 5 | not_started |
+| Transaction history and normalization | 4, 5 | complete |
+| Wallet/entity relationship analysis | 5, 6 | in_progress |
+| Transaction graph generation | 5 | complete |
+| Transaction Graph Post-Report Filtering | 5 | complete |
 | Cryptocurrency exchange/VASP identification | 6 | not_started |
 | Fraud and suspicious-activity detection | 6, 9 | not_started |
 | Risk scoring, confidence, and explainable indicators | 6, 9 | not_started |
@@ -237,6 +251,9 @@ Rules to enforce during ML phases:
 | 2026-09-13 | `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q`; Alembic head; OpenAPI/compile checks | 50 passed, 1 explicit live smoke skipped, and 2 known TestClient/AnyIO deprecation warnings. One migration head remains `20260913_0002`; OpenAPI version `1.4.0-phase4` exposes 35 paths including scoped ingestion. |
 | 2026-09-13 | `npm run lint`; `npm run build` | Lint passed with the same pre-existing warnings. The sandbox blocked Vite subprocess creation; the approved normal-environment build then passed with 256 modules and the unchanged 576.07 kB chunk-size warning. |
 | 2026-09-13 | `git commit -m "Implement SIH26183 Phase 4 blockchain ingestion"`; push and remote SHA check | Created Phase 4 commit `23b30b21081f21ef51448cae0951180f6d46d92e` as `Ali <alizamir9992@gmail.com>` and verified the remote branch resolves to the same SHA. |
+| 2026-09-13 | Re-read implementation plan, baseline, updated PRD, progress tracker, and current trace, persistence, provider, API, cache, and test code | Confirmed Phase 5-only scope: bounded tracing, immutable temporal graph snapshots, post-report filtering, read-only graph APIs, and visualization-only trails. |
+| 2026-09-13 | `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q`; OpenAPI assertion | 52 tests passed, one explicit live provider smoke test was skipped, and two existing TestClient/AnyIO deprecation warnings remain. Version `1.5.0-phase5` exposes 38 paths including graph, transaction, live-trail, and trace-path reads. |
+| 2026-09-13 | `npm run lint`; `npm run build` | Lint passed with the existing frontend warnings. The sandbox could not spawn Vite's child process; the approved normal-environment build completed 256 modules with the unchanged 576.07 kB chunk-size warning. No frontend source changed. |
 
 ## Phase Completion Log
 
