@@ -131,7 +131,7 @@ class Settings:
 
         return cls(
             app_env=app_env,
-            app_version=source.get("APP_VERSION", "1.7.0-phase7"),
+            app_version=source.get("APP_VERSION", "1.8.0-phase8"),
             log_level=source.get("LOG_LEVEL", "INFO").upper(),
             database_url=source.get("DATABASE_URL", "sqlite:///./cfas.db"),
             jwt_secret_key=source.get("JWT_SECRET_KEY", source.get("SECRET_KEY", DEVELOPMENT_SECRET)),

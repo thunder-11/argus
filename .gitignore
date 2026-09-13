@@ -30,3 +30,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# External ML datasets and generated model artifacts
+backend/data/external/
+backend/artifacts/ml/
+.tmp/

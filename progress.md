@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_7_complete`
+Overall status: `phase_8_complete_shadow_only`
 Last updated: 2026-09-13 Asia/Calcutta
-Current objective: Phase 7 is complete; Phase 8 fresh training and evaluation can begin once an approved reviewed dataset is available.
+Current objective: Phase 8 is complete as a research/shadow-only prototype; Phase 9 can serve only a reviewed, promoted model.
 
 ## Phase Tracker
 
@@ -25,7 +25,7 @@ Current objective: Phase 7 is complete; Phase 8 fresh training and evaluation ca
 | 5 | Tracing and Temporal Transaction Graphs | complete | `dc317a3576f96a93ef14270d3f84dae5d2180850` | verified on `origin/sih26183/implementation` | Bounded evidence paths, immutable graph snapshots, report-event time partitions, side-effect-free graph queries, cursors, and visualization-only live trails are implemented. |
 | 6 | Attribution and Deterministic Analytics | complete | `a42dc1e` | verified on `origin/sih26183/implementation` | Reviewed point-in-time labels, conservative nearest-VASP attribution, privacy boundaries, cluster false-positive controls, qualified cross-victim correlation, and versioned rule evidence are implemented. |
 | 7 | Fresh ML Data and Feature Platform | complete | `d731932` | verified on `origin/sih26183/implementation` | Independent manifests, five-state labels, dual review, causal features, grouped chronological splits, privacy/poisoning controls, and non-reuse audit are implemented. |
-| 8 | Fresh ML Training, Validation, and Evaluation | not_started | pending | pending | Promotion depends on measurable PRD quality gates. |
+| 8 | Fresh ML Training, Validation, and Evaluation | complete_shadow_only | pending | pending | Fresh Elliptic++ BTC research baselines, chronological evaluation, calibration, artifact verification, and gates are implemented. Unstated source license and non-dual-reviewed labels prohibit promotion. |
 | 9 | ML Inference, Explainability, and Human Review | not_started | pending | pending | Decision support only, with analyst override. |
 | 10 | Real-Time Status, Monitoring, and Alerts | not_started | pending | pending | Durable status stream and alerts. |
 | 11 | Reports, Evidence, and Investigator Operations | not_started | pending | pending | Immutable reports and evidence manifests. |
@@ -185,6 +185,16 @@ Recorded before implementation:
 | Verify Phase 7 | done | 62 backend tests passed, one credential-gated provider smoke skipped, compile/dependency/migration/OpenAPI checks passed, and frontend lint/build passed with unchanged warnings. |
 | Finalize/push Phase 7 | done | Implementation commit `d731932` and completion commit `653f20f` were pushed and independently matched to `origin/sih26183/implementation`. |
 
+## Phase 8 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Acquire independent research data | done | Publisher-linked Elliptic++ BTC transaction and wallet files were acquired outside Git; tracked manifest records source IDs, byte counts, and SHA-256 checksums. |
+| Implement fresh research adapters | done | `app/new_ml/elliptic_plus.py` uses no legacy ML code, excludes anonymous transaction features, freezes temporal purge/embargo splits, hashes public IDs in outputs, and retains only final wallet observations. |
+| Implement lightweight baseline and evaluation | done | A balanced stochastic logistic baseline, validation threshold, disjoint sigmoid calibration, final-test metrics, bootstrap precision interval, quality gates, latency measure, model card, and hash replay verification are implemented. |
+| Enforce promotion restrictions | done | Every run is forced to `shadow` because the source license is unstated and labels are not locally dual-reviewed; failed PRD gates are retained in the experiment manifest. |
+| Validate Phase 8 | done | Focused Phase 7–8 tests and full backend regression pass; the transfer-risk real-data CLI run wrote and reloaded a hash-verified shadow artifact. The wallet adapter uses the same CLI path and is fixture-tested; full wallet execution is intentionally deferred on this memory-limited workstation. |
+
 ## Requirement Coverage Map
 
 | PRD Area | Planned Phase(s) | Status |
@@ -235,7 +245,7 @@ Rules to enforce during ML phases:
 | Item | Status | Impact | Next action |
 | --- | --- | --- | --- |
 | Real blockchain provider keys | open | Live API smoke tests may be skipped until keys are available. | Add env placeholders and mark live tests conditional. |
-| ML labeled dataset availability | open | Phase 7 infrastructure is complete, but Phase 8 cannot make credible quality or promotion claims without representative mature dual-reviewed labels. | Supply or acquire approved data through the new manifest/review workflow; otherwise Phase 8 remains synthetic pipeline validation and shadow-only. |
+| Reviewed/licensed ML labels | open | Phase 8 is implemented but the acquired Elliptic++ source has no stated license and its labels are not locally dual-reviewed, so all outputs are shadow-only. | Obtain approved licensed data and complete local independent label review before any Phase 9 serving or promotion decision. |
 | Superseded tracked planning files | resolved | The user authorized their removal before Phase 2. | Exactly three files were deleted and pushed in cleanup commit `bdd8926`; the authoritative PRD and implementation trackers remain. |
 | Live PostgreSQL/Redis integration environment | open | Phase 2 validates PostgreSQL DDL and durable semantics locally but has no provisioned external services in this workspace. | Run the same migration and worker integration suite against deployed services during Phase 13 operational hardening. |
 | Current backend/frontend PRD compliance | assessed | Baseline conflicts and missing contracts are now known; feature-level compliance remains unimplemented. | Address findings phase by phase, beginning with Phase 1. |
@@ -299,6 +309,7 @@ Rules to enforce during ML phases:
 | 2026-09-13 | `git commit -m "Implement SIH26183 Phase 7 ML data platform"` | Created implementation commit `d731932`, authored by `Ali <alizamir9992@gmail.com>`. |
 
 | 2026-09-13 | `git push origin sih26183/implementation`; `git ls-remote origin refs/heads/sih26183/implementation` | Pushed Phase 7 implementation and completion commits; remote branch resolves to `653f20f2389e36af182d7e6a62c118f832b2e33f`. |
+| 2026-09-13 | `python -m pytest -p no:cacheprovider --basetemp E:\\Ali\\Crypto\\.tmp\\phase8-full -q`; `python -m compileall -q app/new_ml scripts`; `python -m alembic heads`; `python -m pip check` | 65 tests passed, one credential-gated live smoke skipped, and one known TestClient warning remains; compilation passed, migration head is `20260913_0004`, and dependencies are consistent. |
 
 ## Phase Completion Log
 
@@ -313,3 +324,4 @@ Rules to enforce during ML phases:
 - 2026-09-13: Phase 5 completed. Bounded evidence paths, immutable temporal graphs, exact report-time partitions, separate context, filter-bound reads, and visualization-only live trails were committed as `dc317a3576f96a93ef14270d3f84dae5d2180850` and verified on GitHub.
 - 2026-09-13: Phase 6 completed. Reviewed point-in-time VASP labels, conservative exact/sweep attribution, mixer/bridge boundaries, cluster false-positive controls, qualified distinct-victim correlation, and the explainable `prd-six-factor-v1` composite were committed as `a42dc1e`; completion commit `5bcadf4` was pushed and verified on GitHub.
 - 2026-09-13: Phase 7 completed and pushed. The new independent data boundary provides reproducible source manifests, privacy/poisoning isolation, five-state dual-reviewed labels, causal temporal features, frozen grouped chronological splits, and non-reuse audits. Implementation commit `d731932` and completion commit `653f20f` are verified on GitHub; real reviewed data remains required for Phase 8 quality claims.
+- 2026-09-13: Phase 8 completed as a lightweight, research/shadow-only prototype. Fresh Elliptic++ BTC adapters, a reproducible logistic baseline, calibration, chronological final-test evaluation, artifact hash replay, and explicit PRD gates are implemented. The publisher's unstated license and absence of local dual review prohibit promotion regardless of metrics.
