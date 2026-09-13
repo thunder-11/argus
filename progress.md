@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_6_complete`
+Overall status: `phase_7_complete`
 Last updated: 2026-09-13 Asia/Calcutta
-Current objective: Phase 6 is complete; Phase 7 fresh ML data and feature platform work is ready to start under the strict non-reuse boundary.
+Current objective: Phase 7 is complete; Phase 8 fresh training and evaluation can begin once an approved reviewed dataset is available.
 
 ## Phase Tracker
 
@@ -23,8 +23,8 @@ Current objective: Phase 6 is complete; Phase 7 fresh ML data and feature platfo
 | 3 | Identity, Intake, and Case Workflow | complete | `90b9d877ea178b0a642fa60e70afde715252cbe7` | verified on `origin/sih26183/implementation` | Session revocation, agency/case scope, exact intake/report time, immutable corrections, case workflow, audit, and exactly-once initial queueing; 41 backend tests pass. |
 | 4 | Real Blockchain Ingestion | complete | `23b30b21081f21ef51448cae0951180f6d46d92e` | verified on `origin/sih26183/implementation` | Typed BTC/ETH/TRON/BSC/Polygon adapters, exact normalized persistence, provider provenance, resilient pagination/retry/finality handling, and a scoped durable refresh contract; 50 backend tests pass and one opt-in live smoke test is skipped without credentials. |
 | 5 | Tracing and Temporal Transaction Graphs | complete | `dc317a3576f96a93ef14270d3f84dae5d2180850` | verified on `origin/sih26183/implementation` | Bounded evidence paths, immutable graph snapshots, report-event time partitions, side-effect-free graph queries, cursors, and visualization-only live trails are implemented. |
-| 6 | Attribution and Deterministic Analytics | complete | `a42dc1e` | local; push awaiting explicit authorization | Reviewed point-in-time labels, conservative nearest-VASP attribution, privacy boundaries, cluster false-positive controls, qualified cross-victim correlation, and versioned rule evidence are implemented. |
-| 7 | Fresh ML Data and Feature Platform | not_started | pending | pending | Existing backend ML must not be reused. |
+| 6 | Attribution and Deterministic Analytics | complete | `a42dc1e` | verified on `origin/sih26183/implementation` | Reviewed point-in-time labels, conservative nearest-VASP attribution, privacy boundaries, cluster false-positive controls, qualified cross-victim correlation, and versioned rule evidence are implemented. |
+| 7 | Fresh ML Data and Feature Platform | complete | `d731932` | pending final push/verification | Independent manifests, five-state labels, dual review, causal features, grouped chronological splits, privacy/poisoning controls, and non-reuse audit are implemented. |
 | 8 | Fresh ML Training, Validation, and Evaluation | not_started | pending | pending | Promotion depends on measurable PRD quality gates. |
 | 9 | ML Inference, Explainability, and Human Review | not_started | pending | pending | Decision support only, with analyst override. |
 | 10 | Real-Time Status, Monitoring, and Alerts | not_started | pending | pending | Durable status stream and alerts. |
@@ -165,7 +165,25 @@ Recorded before implementation:
 | Add read and materialization APIs | done | Authenticated entity, attribution, cluster, correlation, and risk reads remain side-effect free; `POST /cases/{id}/analytics` idempotently materializes immutable rule/risk results. OpenAPI exposes 45 paths. |
 | Add Phase 6 migration and documentation | done | Alembic head `20260913_0003` adds directory legal/service/FIU/contact provenance and assertion review metadata; `ANALYTICS.md` documents confidence separation and boundaries. |
 | Verify Phase 6 | done | 56 backend tests passed, one explicit live-provider smoke test was skipped without credentials, Python compilation and `pip check` passed, and frontend lint/build passed with the unchanged recorded warnings. |
-| Finalize/push Phase 6 | partial | The implementation and completion record exist in local commits; publishing to the external GitHub remote awaits explicit user authorization. |
+| Finalize/push Phase 6 | done | Implementation commit `a42dc1e` and completion commit `5bcadf4` were pushed and verified on `origin/sih26183/implementation`. |
+
+## Phase 7 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Define fresh ML tasks and semantics | done | Separate wallet-risk, transfer-risk, pattern-multilabel, and complaint-typology contracts define their units/targets and explicitly reject criminality or forecasting claims. |
+| Add reproducible dataset manifests | done | Immutable snapshot hashes bind version, purpose, mode, task scope, period, access/retention policy, manifest, and ordered sources. |
+| Govern source provenance and use | done | Sources retain owner, license, permitted purpose, chains, coverage, collection method, identity keys, label meaning, availability semantics, limitations, deletion constraints, acquisition time, SHA-256, and provenance. |
+| Isolate unsafe or unsupported data | done | PII/secret-shaped manifest fields, conflicting content-hash provenance, unlicensed research sources, unsupported chains, synthetic/live mixing, and unauthorized live sources fail closed. Synthetic fixtures cannot support quality claims. |
+| Implement five-state label revisions | done | Positive, negative, unknown, disputed, and censored states are append-only; reviewed states require evidence and operational/model outputs cannot become labels. |
+| Enforce dual review and maturity | done | Label authors cannot self-review; two independent confirmations, no rejection, maturity, and label-cutoff availability are required for training eligibility. |
+| Build point-in-time feature platform | done | `fresh-wallet-features-v1` registers versioned velocity, graph/structure, amount/asset, peeling, VASP, protocol, correlation, and provider-quality definitions with units, sources, missing behavior, windows, owners, and cutoff policies. |
+| Separate temporal modes and prevent leakage | done | Baseline requires event/knowledge cutoffs at T0; post-report freezes baseline and namespaces T0<T<=T1 deltas; retrospective mode declares later knowledge. Snapshots retain maximum contributing event/availability times and evidence IDs. |
+| Freeze grouped chronological splits | done | Train, tuning-validation, calibration, and final-test membership is chronological and campaign-group exclusive, with label cutoffs, purge/embargo rules, class counts, exclusions, and content hashes. |
+| Prove independent implementation | done | Static import/artifact audit covers `app/new_ml`; no legacy ML/risk/tracer import or trained model artifact is present. No training or inference is implemented in this phase. |
+| Add APIs, migration, and documentation | done | Nine authenticated/admin-governed `/api/v1/ml-data` contracts are exposed; Alembic head `20260913_0004` adds complete lineage metadata; `NEW_ML_DATA_PLATFORM.md` documents controls and limitations. |
+| Verify Phase 7 | done | 62 backend tests passed, one credential-gated provider smoke skipped, compile/dependency/migration/OpenAPI checks passed, and frontend lint/build passed with unchanged warnings. |
+| Finalize/push Phase 7 | in_progress | Implementation commit `d731932` exists locally; completion record and remote verification are the remaining steps. |
 
 ## Requirement Coverage Map
 
@@ -196,13 +214,13 @@ Recorded before implementation:
 | Testing requirements | all phases | in_progress |
 | API documentation | 1, 13 | in_progress |
 | Deployment/configuration requirements | 1, 13 | in_progress |
-| New ML architecture from scratch | 7, 8, 9, 13 | not_started |
+| New ML architecture from scratch | 7, 8, 9, 13 | in_progress |
 | ML monitoring, drift, retraining, rollback | 9, 13 | not_started |
 | Existing frontend API integration only | 1, 12 | in_progress |
 
 ## ML Non-Reuse Control
 
-Status: `not_started`
+Status: `active_and_enforced_from_phase_7`
 
 Rules to enforce during ML phases:
 
@@ -217,7 +235,7 @@ Rules to enforce during ML phases:
 | Item | Status | Impact | Next action |
 | --- | --- | --- | --- |
 | Real blockchain provider keys | open | Live API smoke tests may be skipped until keys are available. | Add env placeholders and mark live tests conditional. |
-| ML labeled dataset availability | open | Model promotion may be blocked or restricted to shadow/advisory mode. | Start data sourcing and label governance in Phase 7, with preparation earlier if possible. |
+| ML labeled dataset availability | open | Phase 7 infrastructure is complete, but Phase 8 cannot make credible quality or promotion claims without representative mature dual-reviewed labels. | Supply or acquire approved data through the new manifest/review workflow; otherwise Phase 8 remains synthetic pipeline validation and shadow-only. |
 | Superseded tracked planning files | resolved | The user authorized their removal before Phase 2. | Exactly three files were deleted and pushed in cleanup commit `bdd8926`; the authoritative PRD and implementation trackers remain. |
 | Live PostgreSQL/Redis integration environment | open | Phase 2 validates PostgreSQL DDL and durable semantics locally but has no provisioned external services in this workspace. | Run the same migration and worker integration suite against deployed services during Phase 13 operational hardening. |
 | Current backend/frontend PRD compliance | assessed | Baseline conflicts and missing contracts are now known; feature-level compliance remains unimplemented. | Address findings phase by phase, beginning with Phase 1. |
@@ -275,6 +293,10 @@ Rules to enforce during ML phases:
 | 2026-09-13 | `python -m pytest -p no:cacheprovider -q`; Alembic head; Python compile, OpenAPI and dependency checks | 56 tests passed, one credential-gated live smoke skipped, one known TestClient warning remains; migration head is `20260913_0003`, application version is `1.6.0-phase6`, and OpenAPI exposes 45 paths. |
 | 2026-09-13 | `npm run lint`; `npm run build` | Both exited 0 without frontend source changes; the pre-existing lint findings and 576.07 kB chunk warning remain. |
 | 2026-09-13 | `git commit -m "Implement SIH26183 Phase 6 deterministic analytics"` | Created implementation commit `a42dc1e`, authored by `Ali <alizamir9992@gmail.com>`. |
+| 2026-09-13 | Read the full Phase 7 plan plus PRD §§11.1–12.5, split requirements and ML-01–ML-10; inventoried existing lineage tables and repository artifacts/imports | Confirmed strict independent-development scope and found no trained model artifacts to reuse. |
+| 2026-09-13 | `python -m pytest -p no:cacheprovider -q`; Alembic head; Python compile, OpenAPI and dependency checks | 62 tests passed, one credential-gated live smoke skipped, one known TestClient warning remains; migration head is `20260913_0004`, application version is `1.7.0-phase7`, and OpenAPI exposes 54 paths. |
+| 2026-09-13 | `npm run lint`; `npm run build` | Both exited 0 without frontend source changes; existing lint findings and the 576.07 kB chunk warning remain. |
+| 2026-09-13 | `git commit -m "Implement SIH26183 Phase 7 ML data platform"` | Created implementation commit `d731932`, authored by `Ali <alizamir9992@gmail.com>`. |
 
 ## Phase Completion Log
 
@@ -287,4 +309,5 @@ Rules to enforce during ML phases:
 - 2026-09-13: Phase 3 completed. Session revocation, scoped case access, exact report receipt semantics, atomic idempotent intake, immutable correction/history, canonical lifecycle, encrypted protected fields, and exactly-once durable initial analysis queueing were committed as `90b9d877ea178b0a642fa60e70afde715252cbe7`; completion record `a58b162f720d86a59cff10d239f33aacf72f4678` was pushed and verified on GitHub.
 - 2026-09-13: Phase 4 completed. Real BTC/ETH/TRON/BSC/Polygon provider adapters now retain source provenance, exact native/token amounts, pagination, finality, typed provider failures, and idempotent normalized observations; `23b30b21081f21ef51448cae0951180f6d46d92e` was pushed and verified on GitHub. Live smoke remains explicitly credential-gated.
 - 2026-09-13: Phase 5 completed. Bounded evidence paths, immutable temporal graphs, exact report-time partitions, separate context, filter-bound reads, and visualization-only live trails were committed as `dc317a3576f96a93ef14270d3f84dae5d2180850` and verified on GitHub.
-- 2026-09-13: Phase 6 completed locally. Reviewed point-in-time VASP labels, conservative exact/sweep attribution, mixer/bridge boundaries, cluster false-positive controls, qualified distinct-victim correlation, and the explainable `prd-six-factor-v1` composite were committed as `a42dc1e`; 56 backend tests pass and the existing frontend remains compatible. External push is pending explicit authorization.
+- 2026-09-13: Phase 6 completed. Reviewed point-in-time VASP labels, conservative exact/sweep attribution, mixer/bridge boundaries, cluster false-positive controls, qualified distinct-victim correlation, and the explainable `prd-six-factor-v1` composite were committed as `a42dc1e`; completion commit `5bcadf4` was pushed and verified on GitHub.
+- 2026-09-13: Phase 7 completed locally. The new independent data boundary provides reproducible source manifests, privacy/poisoning isolation, five-state dual-reviewed labels, causal temporal features, frozen grouped chronological splits, and non-reuse audits. Implementation commit `d731932` passes 62 backend tests; real reviewed data remains required for Phase 8 quality claims.
