@@ -31,6 +31,11 @@ entity attribution, conservative clustering, and qualified correlation live in
 tracing, or ML implementations. Policy and confidence semantics are documented
 in `ANALYTICS.md`.
 
+Phase 7's independent data and feature boundary lives under `app/new_ml`. It is
+limited to fresh manifests, human labels, causal features, and frozen split
+membership; model training and inference are intentionally absent until later
+phases. See `NEW_ML_DATA_PLATFORM.md`.
+
 ## Runtime Modes
 
 `DATA_MODE=fixture` requires `DEMO_ENABLED=true` and is limited to development or test operation. `DATA_MODE=live` never falls back to generated transactions. Production startup rejects fixture data, demo mode, wildcard CORS, placeholder/default JWT secrets, unsupported chains, invalid trace limits, and missing credentials for enabled chains.

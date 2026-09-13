@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.routes.system import router as system_router
 from app.api.routes.workflow import router as workflow_router
 from app.api.routes.analytics import router as analytics_router
+from app.api.routes.ml_data import router as ml_data_router
 from auth.router import router as auth_router
 from routers.complaints import router as complaints_router
 from routers.traces import router as traces_router, trace_read_router
@@ -16,6 +17,7 @@ api_router.include_router(system_router)
 api_router.include_router(auth_router)
 api_router.include_router(workflow_router)
 api_router.include_router(analytics_router)
+api_router.include_router(ml_data_router)
 api_router.include_router(complaints_router)
 api_router.include_router(traces_router)
 api_router.include_router(trace_read_router)
