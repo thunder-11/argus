@@ -50,9 +50,12 @@ class ReportEvent(Base, ImmutableRecord):
     __tablename__ = "report_events"
     id = Column(String(36), primary_key=True, default=new_id)
     case_id = Column(String(36), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    complaint_id = Column(String(36), ForeignKey("complaint_records.id", ondelete="CASCADE"), index=True)
     revision = Column(Integer, nullable=False)
     report_timestamp = Column(UtcTimestamp(), nullable=False)
     reported_timezone = Column(String(64), nullable=False)
+    original_timestamp = Column(String(80), nullable=False, default="legacy-unspecified")
+    iana_timezone = Column(String(64))
     timestamp_precision = Column(String(24), nullable=False, default="microsecond")
     verification_state = Column(String(24), nullable=False, default="unverified")
     verified_at = Column(UtcTimestamp())
@@ -60,6 +63,8 @@ class ReportEvent(Base, ImmutableRecord):
     correction_reason = Column(Text)
     supersedes_id = Column(String(36), ForeignKey("report_events.id"))
     source_system = Column(String(64), nullable=False)
+    channel = Column(String(64), nullable=False, default="legacy-unspecified")
+    receipt_reference = Column(String(180))
     external_event_id = Column(String(150))
     received_at = Column(UtcTimestamp(), nullable=False, default=utc_now)
     created_by = Column(String(36), ForeignKey("users.id"))
@@ -447,6 +452,7 @@ class UserSession(Base):
     expires_at = Column(UtcTimestamp(), nullable=False)
     revoked_at = Column(UtcTimestamp())
     last_seen_at = Column(UtcTimestamp())
+    revoked_reason = Column(String(100))
 
 
 class ApiClient(Base):
@@ -542,6 +548,46 @@ class CaseEvent(Base, ImmutableRecord):
     occurred_at = Column(UtcTimestamp(), nullable=False, default=utc_now)
     payload = Column(JSON, nullable=False, default=dict)
     __table_args__ = (UniqueConstraint("case_id", "sequence", name="uq_case_event_sequence"),)
+
+
+class CaseAccessGrant(Base):
+    __tablename__ = "case_access_grants"
+    case_id = Column(String(36), ForeignKey("cases.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    permission = Column(String(24), nullable=False, default="read")
+    granted_by = Column(String(36), ForeignKey("users.id"), nullable=False)
+    granted_at = Column(UtcTimestamp(), nullable=False, default=utc_now)
+    revoked_at = Column(UtcTimestamp())
+
+
+class CaseAttachment(Base, ImmutableRecord):
+    __tablename__ = "case_attachments"
+    id = Column(String(36), primary_key=True, default=new_id)
+    case_id = Column(String(36), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
+    mime_type = Column(String(120), nullable=False)
+    size_bytes = Column(Integer, nullable=False)
+    sha256 = Column(String(64), nullable=False)
+    storage_reference = Column(Text, nullable=False)
+    uploaded_by = Column(String(36), ForeignKey("users.id"), nullable=False)
+    created_at = Column(UtcTimestamp(), nullable=False, default=utc_now)
+    __table_args__ = (
+        CheckConstraint("size_bytes >= 0", name="ck_case_attachment_size"),
+        UniqueConstraint("case_id", "sha256", name="uq_case_attachment_digest"),
+    )
+
+
+class IdempotencyRecord(Base, ImmutableRecord):
+    __tablename__ = "idempotency_records"
+    id = Column(String(36), primary_key=True, default=new_id)
+    actor_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    operation = Column(String(80), nullable=False)
+    idempotency_key = Column(String(180), nullable=False)
+    request_digest = Column(String(64), nullable=False)
+    response_status = Column(Integer, nullable=False)
+    response_payload = Column(JSON, nullable=False)
+    created_at = Column(UtcTimestamp(), nullable=False, default=utc_now)
+    __table_args__ = (UniqueConstraint("actor_id", "operation", "idempotency_key", name="uq_idempotency_actor_operation_key"),)
 
 
 class Network(Base):
@@ -905,7 +951,8 @@ PHASE2_TABLE_NAMES = (
     "report_revisions", "audit_events", "background_jobs", "outbox_events",
     "graph_projection_checkpoints",
     "agencies", "user_sessions", "api_clients", "user_agency_scopes", "victims", "complaint_records",
-    "case_complaints", "complaint_wallets", "case_notes", "case_events", "networks",
+    "case_complaints", "complaint_wallets", "case_notes", "case_events", "case_access_grants",
+    "case_attachments", "idempotency_records", "networks",
     "bitcoin_outpoints", "protocol_contracts", "cross_chain_links", "clusters",
     "cluster_memberships", "rule_findings", "ml_dataset_snapshots", "ml_dataset_sources",
     "ml_label_revisions", "ml_label_adjudications", "ml_feature_definitions",
@@ -924,6 +971,7 @@ for _immutable_model in (
     ReportEvent, ProviderObservation, NormalizedTransaction, EntityAddressAssertion,
     AnalysisRun, AnalysisRunEvent, TracePath, GraphSnapshot, EvidenceSnapshot, RiskResult,
     MLPrediction, AnalystReview, ReportRevision, AuditEvent, CaseNote, CaseEvent,
+    CaseAttachment, IdempotencyRecord,
     BitcoinOutpoint, CrossChainLink, Cluster, ClusterMembership, RuleFinding,
     DatasetSnapshot, DatasetSource, LabelRevision, LabelAdjudication, FeatureDefinition,
     FeatureSnapshot, SplitManifest, ExperimentRun, ModelPackage, PredictionExplanation,

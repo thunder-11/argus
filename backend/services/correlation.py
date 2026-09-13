@@ -12,6 +12,10 @@ def find_linked_cases(case_id: str, db: Session) -> dict:
     Find all other cases that share at least one wallet node
     with the given case's traced graph.
     """
+    source_case = db.query(Case).filter(Case.id == case_id).first()
+    if source_case is None:
+        return {"linked_cases": [], "possible_syndicate": False, "linked_count": 0}
+
     # Get all wallet addresses in this case's graph
     this_case_wallets = db.query(CaseWallet).filter(
         CaseWallet.case_id == case_id
@@ -42,7 +46,7 @@ def find_linked_cases(case_id: str, db: Session) -> dict:
     # Enrich with case details
     linked_cases = []
     for cid, data in linked.items():
-        case = db.query(Case).filter_by(id=cid).first()
+        case = db.query(Case).filter(Case.id == cid, Case.agency_id == source_case.agency_id).first()
         if case:
             linked_cases.append({
                 "case_id": case.id,

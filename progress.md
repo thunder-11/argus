@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_2_complete`
-Last updated: 2026-09-12 Asia/Calcutta  
-Current objective: Phase 2 is complete; Phase 3 identity, intake, and case workflow is ready to start.
+Overall status: `phase_3_complete`
+Last updated: 2026-09-13 Asia/Calcutta
+Current objective: Phase 3 is complete; Phase 4 real blockchain ingestion is ready to start.
 
 ## Phase Tracker
 
@@ -20,7 +20,7 @@ Current objective: Phase 2 is complete; Phase 3 identity, intake, and case workf
 | 0 | Planning and Baseline | complete | `979864b22cdc23a49bd8b6ef9efa30e56a04a37c` | verified on `origin/sih26183/implementation` | Runtime baseline, inventory, checks, and traceability map completed. |
 | 1 | Modular Backend Foundation and Test Harness | complete | `b7e34adba4d4b962bc368cc1524f9e4cf14cd200` | verified on `origin/sih26183/implementation` | 21 tests passed; modular foundation and compatibility contracts established. |
 | 2 | Persistence and Durable Processing | complete | `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e` | verified on `origin/sih26183/implementation` | 69 managed tables, immutable forensic revisions, durable jobs/outbox, cache isolation, and rebuildable graph projection contract; 35 backend tests pass. |
-| 3 | Identity, Intake, and Case Workflow | not_started | pending | pending | Awaiting Phase 2 completion. |
+| 3 | Identity, Intake, and Case Workflow | complete | pending | pending | Session revocation, agency/case scope, exact intake/report time, immutable corrections, case workflow, audit, and exactly-once initial queueing; 41 backend tests pass. |
 | 4 | Real Blockchain Ingestion | not_started | pending | pending | Requires provider credential placeholders and optional live API keys. |
 | 5 | Tracing and Temporal Transaction Graphs | not_started | pending | pending | Includes Transaction Graph Post-Report Filtering. |
 | 6 | Attribution and Deterministic Analytics | not_started | pending | pending | VASP labels, clustering, typologies, and rule evidence. |
@@ -105,11 +105,30 @@ Recorded before implementation:
 | Verify existing frontend remains compatible | done | `npm run lint` and `npm run build` exited 0 without frontend changes; the same pre-existing lint and bundle-size warnings remain. |
 | Finalize/push Phase 2 | done | Commit `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e`, authored by `Ali <alizamir9992@gmail.com>`, was pushed and independently matched with `git ls-remote`. |
 
+## Phase 3 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Add expiring, revocable sessions | done | Login issues access/rotating refresh tokens backed by `user_sessions`; refresh replay and revoked/expired sessions fail closed; logout revokes the session; `/auth/me` exposes current agency and permissions. |
+| Enforce roles and object scope | done | Agency membership, investigator assignment, explicit read/write grants, analyst/admin assignment and sharing, case-scoped totals, complaint scope, related-case agency limits, and authenticated WebSocket admission are enforced. Unauthorized, role-denied, and cross-agency tests pass. |
+| Validate wallet identity locally | done | `/wallets/validate` covers BTC Base58/Bech32 checksums, TRON Base58Check, EVM encoding/checksum and explicit ETH/BSC/Polygon ambiguity; synthetic identifiers are accepted only in explicit fixture mode. |
+| Implement atomic complaint intake | done | Intake stores separate agency-scoped complaint/victim/case/address joins, protects victim/narrative fields with authenticated encryption, retains exact decimal loss, rejects every invalid/ambiguous wallet with field errors, and returns HTTP 201 with complaint/case/report/run/job identifiers. |
+| Capture exact report receipt time | done | ISO-8601 offset is mandatory for supplied times; UTC conversion retains original representation, offset, optional IANA zone and precision. Offset/zone mismatch, offset-less time, future skew, and precision beyond microseconds are rejected. Direct API receipt time is explicitly recorded when no source time is supplied. |
+| Add immutable report corrections | done | Report events are complaint-linked append-only revisions; corrections require an expected revision and reason, preserve the prior row, update a selected primary reference, and emit case/audit history. |
+| Make retries idempotent | done | Actor/operation/key/request digests replay identical intake responses and return 409 for conflicting reuse. Natural agency/source/reference keys cover callers without an explicit header, while duplicate references remain independent across agencies. |
+| Queue exactly one initial analysis | done | A valid intake creates one immutable analysis run plus one durable idempotent background job/outbox record in the same transaction. The legacy follow-up trace POST returns the existing active run with HTTP 202 instead of executing or duplicating it. |
+| Implement case workflow | done | Canonical lifecycle transitions, legacy status aliases, optimistic revisions, required external confirmation for escalated/frozen states, assignment, reopen, protected notes, attachment metadata, access grants, status, and immutable history APIs are implemented and audited. |
+| Add Phase 3 migration | done | Alembic `20260913_0002` upgrades and rolls back cleanly, backfills agency scope, relaxes legacy global complaint-reference uniqueness, extends report/session records, and adds access-grant, attachment, and idempotency tables. Metadata now contains 72 tables and compiles for PostgreSQL. |
+| Verify API and dependencies | done | Pinned Python 3.14.3 environment has 51 compatible packages; 82 backend Python files parse; OpenAPI 3 generation exposes 34 paths and all checked Phase 3 contracts. |
+| Verify backend regression | done | Final pinned-runtime run collected 41 tests and all passed in 4.06 seconds; two upstream TestClient/AnyIO deprecation warnings remain visible. |
+| Verify existing frontend remains compatible | done | `npm run lint` exited 0 with the same pre-existing warnings; `npm run build` built 256 modules and exited 0 with the unchanged 576.07 kB chunk-size warning. No frontend source or design changes were made. |
+| Finalize/push Phase 3 | in_progress | Phase implementation and evidence are complete; commit and remote verification are the remaining finalization steps. |
+
 ## Requirement Coverage Map
 
 | PRD Area | Planned Phase(s) | Status |
 | --- | --- | --- |
-| Victim-reported wallet submission and validation | 3 | not_started |
+| Victim-reported wallet submission and validation | 3 | complete |
 | Multi-blockchain support | 4 | not_started |
 | Real-time blockchain data retrieval | 4, 10 | not_started |
 | Transaction history and normalization | 4, 5 | not_started |
@@ -119,13 +138,13 @@ Recorded before implementation:
 | Cryptocurrency exchange/VASP identification | 6 | not_started |
 | Fraud and suspicious-activity detection | 6, 9 | not_started |
 | Risk scoring, confidence, and explainable indicators | 6, 9 | not_started |
-| Investigation and case management | 3, 11 | not_started |
+| Investigation and case management | 3, 11 | in_progress |
 | Real-time analysis status/progress | 10 | not_started |
 | Alerts and notifications | 10 | not_started |
 | Reports and evidence | 11 | not_started |
 | Search, filtering, pagination, and history | 11, 12 | not_started |
 | Authentication, authorization, and security | 1, 3, 20-security coverage through all phases | in_progress |
-| Audit logs | 3, 11 | not_started |
+| Audit logs | 3, 11 | in_progress |
 | Database/data models | 2 | complete |
 | Caching | 2, 4, 10 | in_progress |
 | Background jobs/queues | 2, 10 | in_progress |
@@ -162,7 +181,7 @@ Rules to enforce during ML phases:
 | TestClient deprecation warning | open | The current FastAPI/Starlette compatibility layer warns that its HTTPX TestClient path is deprecated. Tests pass and behavior is unaffected. | Replace the transport when the framework provides the supported migration path; keep warning visible meanwhile. |
 | Legacy handler internals | open | Existing compatibility routers still contain direct database/business logic while staged domain migration proceeds. | Move handlers behind the new controller/service/repository boundaries in their owning functional phases. |
 | Provider result-state normalization | open | Legacy provider functions can represent both a successful empty history and some provider failures as an empty list. Synthetic fallback is removed, but complete/partial/unavailable coverage awaits adapters. | Implement typed provider adapters and normalized coverage in Phase 4. |
-| WebSocket authorization/durability | open | Compatibility WebSocket remains process-local and unauthenticated. | Add scoped authentication in Phase 3 and durable replay/status behavior in Phase 10. |
+| WebSocket authorization/durability | partially_resolved | Phase 3 authenticates sessions and enforces case scope at connection admission; the compatibility stream remains process-local and non-replayable. | Replace its event source with Phase 10 durable replay/status behavior. |
 
 ## Command Log
 
@@ -194,6 +213,11 @@ Rules to enforce during ML phases:
 | 2026-09-12 | `python -m pip check`; Python AST parse; application startup/OpenAPI smoke | No broken requirements; all 72 backend Python files parsed; root/OpenAPI returned 200 with application version `1.2.0-phase2` and 19 paths. |
 | 2026-09-12 | `npm run lint`; `npm run build` | Both exited 0 without frontend changes; existing lint and 576.07 kB chunk warnings remain unchanged. |
 | 2026-09-12 | `git commit -m "Implement SIH26183 Phase 2 persistence"`; `git push origin sih26183/implementation`; remote SHA check | Created Phase 2 commit `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e` as `Ali <alizamir9992@gmail.com>` and verified the remote branch resolves to the identical SHA. |
+| 2026-09-13 | Read `implementation_plan.md`, `phase_0_baseline.md`, the complete updated PRD, `progress.md`, and inspected the current backend/frontend code and Git state | Confirmed Phases 0-2 complete and restricted implementation to Phase 3. |
+| 2026-09-13 | Created an ignored Python 3.14.3 environment from `requirements.txt` and `requirements-dev.txt`; `uv pip check` | Resolved 51 packages; all installed packages are compatible. Added direct pins for the Phase 3 cryptography and Keccak checksum dependencies. |
+| 2026-09-13 | `.venv\\Scripts\\python.exe -m pytest -p no:cacheprovider -q` | Final run: 41 passed in 4.06 seconds; only two upstream deprecation warnings remain. |
+| 2026-09-13 | Alembic head/migration tests; PostgreSQL DDL compilation; AST and OpenAPI checks | One head at `20260913_0002`; fresh upgrade/rollback and legacy adoption pass; 72 tables compile; 82 Python files parse; version `1.3.0-phase3` exposes 34 OpenAPI paths and all checked Phase 3 contracts. |
+| 2026-09-13 | `npm ci`; `npm run lint`; `npm run build` | Locked install found no vulnerabilities. Lint exited 0 with pre-existing warnings. Vite built 256 modules; the existing 576.07 kB chunk warning remains. |
 
 ## Phase Completion Log
 
@@ -203,3 +227,4 @@ Rules to enforce during ML phases:
 - 2026-09-12: Phase 1 completed. Modular backend boundaries, validated runtime modes, canonical errors/request IDs/pagination, explicit fixture isolation, dependency pins, health endpoints, OpenAPI contracts, and a 21-test backend suite were committed as `b7e34adba4d4b962bc368cc1524f9e4cf14cd200` and verified on GitHub.
 - 2026-09-12: The user-authorized cleanup removed three superseded tracked planning files in commit `bdd8926` before Phase 2 implementation began.
 - 2026-09-12: Phase 2 completed. The migration chain manages 69 tables, preserves point-in-time forensic data, provides immutable revisions, and adds durable idempotent jobs/outbox, isolated cache keys, and rebuildable graph projection contracts. Commit `723d09d6d23bbe1bdfaa43109a7be73fb8d12f6e` was verified on GitHub.
+- 2026-09-13: Phase 3 implementation and verification completed. Session revocation, scoped case access, exact report receipt semantics, atomic idempotent intake, immutable correction/history, canonical lifecycle, encrypted protected fields, and exactly-once durable initial analysis queueing are ready for commit and remote verification.

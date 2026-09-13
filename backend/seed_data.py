@@ -13,6 +13,7 @@ from models import (
     VaspDirectory, VaspAddress, MixerBridgeDirectory, Alert,
 )
 from auth.utils import hash_password
+from app.persistence.models import Agency, UserAgencyScope
 
 
 def seed_all(db: Session):
@@ -34,6 +35,15 @@ def seed_all(db: Session):
 # 1. USERS
 # ─────────────────────────────────────────────────────
 def _seed_users(db: Session):
+    agency = Agency(
+        id="agency-local",
+        name="Karnataka Cyber Crime Police",
+        jurisdiction="India/Karnataka",
+        scope={"data_mode": "fixture"},
+        status="active",
+    )
+    db.add(agency)
+    db.flush()
     users = [
         User(
             id="usr-io-001",
@@ -43,6 +53,8 @@ def _seed_users(db: Session):
             police_station="Cyber Crime PS, Bengaluru Central",
             password_hash=hash_password("cfas2026"),
             role="investigator",
+            status="active",
+            primary_agency_id=agency.id,
         ),
         User(
             id="usr-analyst-001",
@@ -52,6 +64,8 @@ def _seed_users(db: Session):
             police_station="I4C National Coordination Centre",
             password_hash=hash_password("cfas2026"),
             role="analyst",
+            status="active",
+            primary_agency_id=agency.id,
         ),
         User(
             id="usr-admin-001",
@@ -61,9 +75,22 @@ def _seed_users(db: Session):
             police_station="State Cyber Crime HQ, Karnataka",
             password_hash=hash_password("cfas2026"),
             role="admin",
+            status="active",
+            primary_agency_id=agency.id,
         ),
     ]
     db.add_all(users)
+    db.flush()
+    db.add_all([
+        UserAgencyScope(
+            user_id=user.id,
+            agency_id=agency.id,
+            role=user.role,
+            permissions=["case:read", "case:write"] + (["case:assign", "case:share"] if user.role in {"analyst", "admin"} else []),
+            status="active",
+        )
+        for user in users
+    ])
     db.flush()
 
 

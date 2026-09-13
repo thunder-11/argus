@@ -68,6 +68,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @application.websocket("/ws/trace/{case_id}")
     async def websocket_trace_endpoint(websocket: WebSocket, case_id: str):
+        authorization = websocket.headers.get("authorization", "")
+        if not authorization.lower().startswith("bearer "):
+            await websocket.close(code=4401, reason="Authentication required")
+            return
+        db = SessionLocal()
+        try:
+            from auth.utils import decode_token
+            from app.persistence.models import UserSession
+            from app.security.authorization import get_accessible_case
+            from models import User
+            payload = decode_token(authorization.split(" ", 1)[1])
+            session = db.query(UserSession).filter(UserSession.id == payload["sid"],
+                                                    UserSession.revoked_at.is_(None)).first()
+            user = db.query(User).filter(User.id == payload["sub"], User.status == "active").first()
+            if session is None or user is None:
+                await websocket.close(code=4401, reason="Session unavailable")
+                return
+            get_accessible_case(db, user, case_id)
+        except Exception:
+            await websocket.close(code=4404, reason="Case unavailable")
+            return
+        finally:
+            db.close()
         await ws_manager.connect(case_id, websocket)
         try:
             while True:

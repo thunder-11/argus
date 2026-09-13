@@ -12,3 +12,5 @@ httpx==0.28.1
 reportlab==5.0.1
 aiofiles==25.1.0
 python-dotenv==1.2.3
+pycryptodome==3.23.0
+cryptography==46.0.5

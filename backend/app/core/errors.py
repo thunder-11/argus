@@ -16,13 +16,15 @@ logger = logging.getLogger(__name__)
 
 class ApplicationError(Exception):
     def __init__(self, *, code: str, message: str, status_code: int = 400, details: Any = None,
-                 retryable: bool = False, headers: dict[str, str] | None = None) -> None:
+                 retryable: bool = False, headers: dict[str, str] | None = None,
+                 field_errors: list[dict[str, Any]] | None = None) -> None:
         self.code = code
         self.message = message
         self.status_code = status_code
         self.details = details
         self.retryable = retryable
         self.headers = headers
+        self.field_errors = field_errors
         super().__init__(message)
 
 
@@ -61,7 +63,7 @@ def install_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code,
             content=_payload(request, code=exc.code, message=exc.message, details=exc.details,
-                             retryable=exc.retryable),
+                             retryable=exc.retryable, field_errors=exc.field_errors),
             headers=exc.headers,
         )
 

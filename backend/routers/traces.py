@@ -1,8 +1,9 @@
 """Trace execution & graph data routers."""
 import time
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Case, CaseWallet, Alert, User, Transaction, Wallet
@@ -12,6 +13,11 @@ from services.risk_scoring import compute_risk_score
 from services.correlation import find_linked_cases
 from config import DEFAULT_MAX_HOPS
 from app.core.errors import ApplicationError
+from app.jobs.contracts import JobState
+from app.persistence.models import AddressRecord, AnalysisRun, ReportEvent
+from app.repositories.phase2 import DurableJobRepository
+from app.repositories.phase3 import WorkflowRepository
+from app.security.authorization import get_accessible_case
 
 router = APIRouter(prefix="/api/v1/cases", tags=["Traces"])
 
@@ -20,128 +26,78 @@ class TraceRequest(BaseModel):
     start_wallet: str | None = None
     chain: str | None = None
     token_symbol: str = "USDT"
-    max_hops: int = DEFAULT_MAX_HOPS
+    max_hops: int = Field(default=DEFAULT_MAX_HOPS, ge=1, le=6)
     min_amount_filter_usd: float = 50.0
 
 
-@router.post("/{case_id}/trace")
-def execute_case_trace(case_id: str, req: TraceRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    case = db.query(Case).filter_by(id=case_id).first()
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+@router.post("/{case_id}/trace", status_code=202)
+def execute_case_trace(case_id: str, req: TraceRequest, db: Session = Depends(get_db),
+                       user: User = Depends(get_current_user),
+                       idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):
+    """Compatibility start route over the durable Phase 3 run created at intake."""
+    case = get_accessible_case(db, user, case_id, write=True)
+    active = db.query(AnalysisRun).filter(
+        AnalysisRun.case_id == case.id,
+        AnalysisRun.run_type == "trace",
+        AnalysisRun.state.in_(["queued", "running", "retrying"]),
+    ).order_by(AnalysisRun.revision.desc()).first()
+    if active is not None:
+        return {"trace_id": active.id, "case_id": case.id, "job_id": _job_id(db, case.id),
+                "status": active.state, "status_url": f"/api/v1/traces/{active.id}", "idempotent_replay": True}
 
-    # Get the start wallet — from request or from case's reported wallets
-    start_wallet = req.start_wallet
-    chain = req.chain
-
-    if not start_wallet:
-        origin = db.query(CaseWallet).filter_by(case_id=case_id, is_origin_reported=True).first()
-        if not origin:
-            origin = db.query(CaseWallet).filter_by(case_id=case_id, hop_depth=0).first()
-        if not origin:
-            origin = db.query(CaseWallet).filter_by(case_id=case_id).first()
-        if not origin:
-            raise ApplicationError(
-                code="ORIGIN_WALLET_REQUIRED",
-                message="The case has no validated origin wallet",
-                status_code=422,
-                details={"case_id": case_id},
-            )
-        start_wallet = origin.wallet_address
-        chain = chain or origin.wallet_chain
-
-    if not chain:
-        from services.blockchain.fetcher import detect_chain
-        chain = detect_chain(start_wallet)
-        if not chain:
-            raise ApplicationError(
-                code="NETWORK_REQUIRED",
-                message="The wallet network is ambiguous or unsupported",
-                status_code=422,
-                details={"case_id": case_id},
-            )
-
-    # Update case status
-    case.status = "UNDER_INVESTIGATION"
+    origin = db.query(CaseWallet).filter_by(case_id=case.id, is_origin_reported=True).first()
+    if origin is None:
+        raise ApplicationError(code="ORIGIN_WALLET_REQUIRED", message="The case has no validated origin wallet",
+                               status_code=422, details={"case_id": case.id})
+    if req.start_wallet and not req.chain:
+        raise ApplicationError(code="NETWORK_REQUIRED", message="The wallet network is ambiguous or unsupported",
+                               status_code=422, details={"case_id": case.id})
+    start_wallet = req.start_wallet or origin.wallet_address
+    chain = (req.chain or origin.wallet_chain or "").upper()
+    if start_wallet != origin.wallet_address or chain != origin.wallet_chain:
+        raise ApplicationError(code="ROOT_NOT_IN_CASE", message="Trace root must be a validated case wallet", status_code=422)
+    report = db.query(ReportEvent).filter(ReportEvent.id == case.primary_report_event_id).first()
+    if report is None:
+        raise ApplicationError(code="REPORT_TIMESTAMP_REQUIRED", message="A report event is required before tracing", status_code=422)
+    address = db.query(AddressRecord).filter(AddressRecord.chain == chain,
+                                             AddressRecord.canonical_address == start_wallet).first()
+    if address is None:
+        raise ApplicationError(code="ORIGIN_WALLET_REQUIRED", message="Validated address record is missing", status_code=422)
+    revision = db.query(func.coalesce(func.max(AnalysisRun.revision), 0)).filter(
+        AnalysisRun.case_id == case.id, AnalysisRun.run_type == "trace").scalar() + 1
+    now = datetime.now(timezone.utc)
+    run = AnalysisRun(case_id=case.id, run_type="trace", revision=revision, state="queued", requested_by=user.id,
+                      report_event_id=report.id, root_address_ids=[address.id], event_cutoff=now,
+                      cutoff_available_time=now, parameters=req.model_dump(), stage="queued", checkpoint={},
+                      coverage={"state": "not_requested"})
+    db.add(run)
     db.flush()
-
-    def _ws_event_callback(event_type, data):
-        import asyncio
-        from app.realtime import ws_manager
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.run_coroutine_threadsafe(
-                    ws_manager.broadcast_to_case(case_id, event_type, data), loop
-                )
-        except Exception:
-            pass
-
-    # Execute trace
-    start_time = time.time()
-    trace_result = execute_trace(
-        start_address=start_wallet,
-        chain=chain,
-        case_id=case_id,
-        db=db,
-        max_hops=req.max_hops,
-        min_amount_usd=req.min_amount_filter_usd,
-        incident_timestamp=case.incident_timestamp,
-        event_callback=_ws_event_callback,
-    )
-    execution_time_ms = int((time.time() - start_time) * 1000)
-
-    # Compute risk score
-    risk_data = compute_risk_score(
-        case_id=case_id,
-        risk_flags=trace_result.get("risk_flags", []),
-        wallet_address=start_wallet,
-        chain=chain,
-        db=db,
-    )
-
-    # Update case
-    case.risk_score = risk_data["composite_risk_score"]
-    case.risk_tier = risk_data["risk_tier"]
-    if trace_result.get("vasp_attribution"):
-        case.status = "ATTRIBUTED"
-
-    # Syndicate correlation
-    correlation = find_linked_cases(case_id, db)
-    if correlation["possible_syndicate"]:
-        case.possible_syndicate = True
-
-    db.flush()
-
-    # Generate alerts
-    _create_trace_alerts(case, trace_result, risk_data, correlation, user, db)
-
+    job, created = DurableJobRepository(db).enqueue_once(operation="trace.run",
+        idempotency_key=idempotency_key or f"trace:{case.id}:{revision}", case_id=case.id,
+        payload={"run_id": run.id, "case_id": case.id, "root_address_ids": [address.id]})
+    job.actor_id = user.id
+    case.status = "investigating"
+    workflow = WorkflowRepository(db)
+    workflow.append_case_event(case_id=case.id, event_type="trace_queued", actor_id=user.id,
+                               payload={"run_id": run.id, "job_id": job.id})
+    workflow.audit(actor_id=user.id, case_id=case.id, action="trace.queue", resource_type="analysis_run",
+                   resource_id=run.id, details={"job_id": job.id})
     db.commit()
+    return {"trace_id": run.id, "case_id": case.id, "job_id": job.id, "status": JobState.QUEUED.value,
+            "status_url": f"/api/v1/traces/{run.id}", "idempotent_replay": not created}
 
-    return {
-        "trace_id": f"tr-{case_id[:8]}",
-        "case_id": case_id,
-        "status": "COMPLETED",
-        "execution_time_ms": execution_time_ms,
-        "total_hops_traversed": trace_result.get("total_hops", 0),
-        "terminal_vasp_attribution": trace_result.get("vasp_attribution"),
-        "risk_assessment": risk_data,
-        "syndicate_correlation": {
-            "is_syndicate_linked": correlation["possible_syndicate"],
-            "linked_case_count": correlation["linked_count"],
-            "linked_complaint_ids": [lc["external_complaint_id"] for lc in correlation["linked_cases"]],
-        },
-        "node_count": len(trace_result.get("nodes", [])),
-        "edge_count": len(trace_result.get("edges", [])),
-    }
+
+def _job_id(db: Session, case_id: str) -> str | None:
+    from app.persistence.models import BackgroundJob
+    job = db.query(BackgroundJob).filter(BackgroundJob.case_id == case_id,
+                                         BackgroundJob.operation == "trace.run").order_by(BackgroundJob.created_at.desc()).first()
+    return job.id if job else None
 
 
 @router.get("/{case_id}/graph")
 def get_case_graph(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Get the visualization graph data for a case."""
-    case = db.query(Case).filter_by(id=case_id).first()
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+    case = get_accessible_case(db, user, case_id)
 
     case_wallets = db.query(CaseWallet).filter_by(case_id=case_id).order_by(CaseWallet.hop_depth).all()
 
@@ -224,9 +180,7 @@ def get_case_graph(case_id: str, db: Session = Depends(get_db), user: User = Dep
 
 @router.get("/{case_id}/related")
 def get_related_cases(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    case = db.query(Case).filter_by(id=case_id).first()
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+    case = get_accessible_case(db, user, case_id)
     return find_linked_cases(case_id, db)
 
 

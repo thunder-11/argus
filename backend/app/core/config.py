@@ -53,6 +53,9 @@ class Settings:
     jwt_secret_key: str
     jwt_algorithm: str
     access_token_expire_hours: int
+    refresh_token_expire_hours: int
+    pii_encryption_key: str
+    report_time_max_future_skew_seconds: int
     cors_allowed_origins: tuple[str, ...]
     data_mode: str
     demo_enabled: bool
@@ -98,6 +101,8 @@ class Settings:
 
         try:
             access_hours = int(source.get("ACCESS_TOKEN_EXPIRE_HOURS", "24"))
+            refresh_hours = int(source.get("REFRESH_TOKEN_EXPIRE_HOURS", "168"))
+            report_skew = int(source.get("REPORT_TIME_MAX_FUTURE_SKEW_SECONDS", "300"))
             default_hops = int(source.get("DEFAULT_MAX_HOPS", "4"))
             max_hops = int(source.get("MAX_HOP_LIMIT", "6"))
             min_amount = float(source.get("MIN_AMOUNT_FILTER_USD", "50"))
@@ -110,12 +115,15 @@ class Settings:
 
         return cls(
             app_env=app_env,
-            app_version=source.get("APP_VERSION", "1.2.0-phase2"),
+            app_version=source.get("APP_VERSION", "1.3.0-phase3"),
             log_level=source.get("LOG_LEVEL", "INFO").upper(),
             database_url=source.get("DATABASE_URL", "sqlite:///./cfas.db"),
             jwt_secret_key=source.get("JWT_SECRET_KEY", source.get("SECRET_KEY", DEVELOPMENT_SECRET)),
             jwt_algorithm=source.get("JWT_ALGORITHM", "HS256"),
             access_token_expire_hours=access_hours,
+            refresh_token_expire_hours=refresh_hours,
+            pii_encryption_key=source.get("PII_ENCRYPTION_KEY", ""),
+            report_time_max_future_skew_seconds=report_skew,
             cors_allowed_origins=_as_csv(source.get("CORS_ALLOWED_ORIGINS"), default_origins),
             data_mode=data_mode,
             demo_enabled=_as_bool(source.get("DEMO_ENABLED"), demo_default),
@@ -189,8 +197,10 @@ class Settings:
             errors.append(f"ENABLED_CHAINS contains unsupported values: {unknown_chains}")
         if not 1 <= self.default_max_hops <= self.max_hop_limit <= 6:
             errors.append("Tracing depth must satisfy 1 <= DEFAULT_MAX_HOPS <= MAX_HOP_LIMIT <= 6")
-        if self.access_token_expire_hours <= 0:
-            errors.append("ACCESS_TOKEN_EXPIRE_HOURS must be positive")
+        if self.access_token_expire_hours <= 0 or self.refresh_token_expire_hours <= 0:
+            errors.append("ACCESS_TOKEN_EXPIRE_HOURS and REFRESH_TOKEN_EXPIRE_HOURS must be positive")
+        if self.report_time_max_future_skew_seconds < 0:
+            errors.append("REPORT_TIME_MAX_FUTURE_SKEW_SECONDS cannot be negative")
         if self.job_lease_seconds <= 0 or self.job_max_attempts <= 0 or self.outbox_batch_size <= 0:
             errors.append("JOB_LEASE_SECONDS, JOB_MAX_ATTEMPTS, and OUTBOX_BATCH_SIZE must be positive")
         if self.data_mode == "fixture" and not self.demo_enabled:
@@ -208,6 +218,8 @@ class Settings:
             if (not _is_configured(self.jwt_secret_key) or self.jwt_secret_key == DEVELOPMENT_SECRET
                     or len(self.jwt_secret_key) < 32):
                 errors.append("Production JWT_SECRET_KEY must be a non-default secret of at least 32 characters")
+            if self.pii_encryption_key and (not _is_configured(self.pii_encryption_key) or len(self.pii_encryption_key) < 32):
+                errors.append("PII_ENCRYPTION_KEY, when set, must be a non-default secret of at least 32 characters")
             if not self.cors_allowed_origins or "*" in self.cors_allowed_origins:
                 errors.append("Production CORS_ALLOWED_ORIGINS must contain explicit origins")
             missing = [chain for chain, state in self.provider_status().items() if state != "configured"]

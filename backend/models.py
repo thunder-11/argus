@@ -5,7 +5,7 @@ Uses SQLite-compatible types (no UUID extension, no ARRAY — uses JSON string i
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Integer, Float, Boolean, Text, DateTime, ForeignKey, Numeric
+    Column, String, Integer, Float, Boolean, Text, DateTime, ForeignKey, Numeric, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from database import Base
@@ -32,9 +32,11 @@ class User(Base):
     police_station = Column(String(150))
     password_hash = Column(String(255), nullable=False)
     role = Column(String(30), nullable=False)  # 'investigator', 'analyst', 'admin'
+    status = Column(String(24), nullable=False, default="active")
+    primary_agency_id = Column(String(36), ForeignKey("agencies.id"))
     created_at = Column(DateTime, default=utcnow)
 
-    cases = relationship("Case", back_populates="assigned_officer")
+    cases = relationship("Case", back_populates="assigned_officer", foreign_keys="Case.assigned_officer_id")
     alerts = relationship("Alert", back_populates="user")
 
 
@@ -46,7 +48,7 @@ class Case(Base):
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     complaint_source = Column(String(30), default="ncrp")
-    external_complaint_id = Column(String(100), unique=True, nullable=False)
+    external_complaint_id = Column(String(100), nullable=False)
     victim_name = Column(String(150))
     victim_phone = Column(String(30))
     reported_loss_amount = Column(Numeric(18, 4), nullable=False)
@@ -59,10 +61,20 @@ class Case(Base):
     risk_tier = Column(String(20), default="MEDIUM")
     possible_syndicate = Column(Boolean, default=False)
     assigned_officer_id = Column(String(36), ForeignKey("users.id"))
+    agency_id = Column(String(36), ForeignKey("agencies.id"), nullable=False, default="agency-local")
+    revision = Column(Integer, nullable=False, default=1)
+    primary_report_event_id = Column(
+        String(36), ForeignKey("report_events.id", use_alter=True, name="fk_cases_primary_report_event")
+    )
+    created_by = Column(String(36), ForeignKey("users.id"))
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
-    assigned_officer = relationship("User", back_populates="cases")
+    __table_args__ = (
+        UniqueConstraint("agency_id", "complaint_source", "external_complaint_id", name="uq_case_agency_source_external"),
+    )
+
+    assigned_officer = relationship("User", back_populates="cases", foreign_keys=[assigned_officer_id])
     case_wallets = relationship("CaseWallet", back_populates="case", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="case", cascade="all, delete-orphan")
     legal_notices = relationship("LegalNotice", back_populates="case", cascade="all, delete-orphan")

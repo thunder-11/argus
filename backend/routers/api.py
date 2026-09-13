@@ -13,6 +13,9 @@ from models import (
 )
 from auth.utils import get_current_user, require_role
 from app.utils.pagination import PageWindow, page_payload
+from app.security.authorization import accessible_case_query, get_accessible_case
+from app.persistence.models import CaseComplaint, ComplaintRecord, Victim
+from app.security.data_protection import unprotect
 from services.report_generator import generate_freeze_notice, generate_forensic_report
 from services.correlation import find_linked_cases
 from services.risk_scoring import compute_risk_score
@@ -24,6 +27,17 @@ from services.risk_scoring import compute_risk_score
 cases_router = APIRouter(prefix="/api/v1/cases", tags=["Cases"])
 
 
+def _protected_case_fields(db: Session, case: Case) -> tuple[str | None, str | None, str | None]:
+    link = db.query(CaseComplaint).filter(CaseComplaint.case_id == case.id, CaseComplaint.role == "primary").first()
+    complaint = db.query(ComplaintRecord).filter(ComplaintRecord.id == link.complaint_id).first() if link else None
+    victim = db.query(Victim).filter(Victim.id == complaint.victim_id).first() if complaint and complaint.victim_id else None
+    return (
+        unprotect(victim.name_ciphertext) if victim else case.victim_name,
+        unprotect(victim.phone_ciphertext) if victim else case.victim_phone,
+        unprotect(complaint.narrative_ciphertext) if complaint else case.complaint_text,
+    )
+
+
 @cases_router.get("")
 def list_cases(
     status: str = None,
@@ -33,11 +47,16 @@ def list_cases(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    query = db.query(Case)
-    if user.role == "investigator":
-        query = query.filter(Case.assigned_officer_id == user.id)
+    query = accessible_case_query(db, user)
     if status:
-        query = query.filter(Case.status == status)
+        aliases = {
+            "NEW": ["NEW", "new"],
+            "UNDER_INVESTIGATION": ["UNDER_INVESTIGATION", "investigating"],
+            "ATTRIBUTED": ["ATTRIBUTED", "escalated_to_vasp"],
+            "FROZEN": ["FROZEN", "frozen"],
+            "CLOSED": ["CLOSED", "closed"],
+        }
+        query = query.filter(Case.status.in_(aliases.get(status, [status])))
     if fraud_type:
         query = query.filter(Case.fraud_typology == fraud_type)
 
@@ -49,11 +68,15 @@ def list_cases(
                 "id": c.id,
                 "external_complaint_id": c.external_complaint_id,
                 "complaint_source": c.complaint_source,
-                "victim_name": c.victim_name,
+                "victim_name": _protected_case_fields(db, c)[0],
                 "fraud_typology": c.fraud_typology,
                 "reported_loss_amount": float(c.reported_loss_amount),
                 "loss_currency": c.loss_currency,
                 "status": c.status,
+                "compatibility_status": {"new": "NEW", "investigating": "UNDER_INVESTIGATION",
+                                         "escalated_to_vasp": "ATTRIBUTED", "frozen": "FROZEN",
+                                         "closed": "CLOSED"}.get(c.status, c.status),
+                "revision": c.revision,
                 "risk_score": c.risk_score,
                 "risk_tier": c.risk_tier,
                 "possible_syndicate": c.possible_syndicate,
@@ -66,9 +89,8 @@ def list_cases(
 
 @cases_router.get("/{case_id}")
 def get_case(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    case = db.query(Case).filter_by(id=case_id).first()
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+    case = get_accessible_case(db, user, case_id)
+    victim_name, victim_phone, complaint_text = _protected_case_fields(db, case)
 
     # Get wallets
     wallets = db.query(CaseWallet).filter_by(case_id=case_id).order_by(CaseWallet.hop_depth).all()
@@ -77,14 +99,19 @@ def get_case(case_id: str, db: Session = Depends(get_db), user: User = Depends(g
         "id": case.id,
         "external_complaint_id": case.external_complaint_id,
         "complaint_source": case.complaint_source,
-        "victim_name": case.victim_name,
-        "victim_phone": case.victim_phone,
+        "victim_name": victim_name,
+        "victim_phone": victim_phone,
         "fraud_typology": case.fraud_typology,
         "reported_loss_amount": float(case.reported_loss_amount),
         "loss_currency": case.loss_currency,
         "incident_timestamp": case.incident_timestamp.isoformat() if case.incident_timestamp else None,
-        "complaint_text": case.complaint_text,
+        "complaint_text": complaint_text,
         "status": case.status,
+        "compatibility_status": {"new": "NEW", "investigating": "UNDER_INVESTIGATION",
+                                 "escalated_to_vasp": "ATTRIBUTED", "frozen": "FROZEN",
+                                 "closed": "CLOSED"}.get(case.status, case.status),
+        "revision": case.revision,
+        "primary_report_event_id": case.primary_report_event_id,
         "risk_score": case.risk_score,
         "risk_tier": case.risk_tier,
         "possible_syndicate": case.possible_syndicate,
@@ -251,9 +278,7 @@ class FreezeNoticeRequest(BaseModel):
 
 @notices_router.post("/{case_id}/generate-freeze-notice")
 def gen_freeze_notice(case_id: str, req: FreezeNoticeRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    case = db.query(Case).filter_by(id=case_id).first()
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+    case = get_accessible_case(db, user, case_id, write=True)
 
     vasp = db.query(VaspDirectory).filter_by(id=req.vasp_id).first()
     if not vasp:
@@ -347,9 +372,7 @@ reports_router = APIRouter(prefix="/api/v1/cases", tags=["Forensic Reports"])
 
 @reports_router.post("/{case_id}/generate-court-report")
 def gen_court_report(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    case = db.query(Case).filter_by(id=case_id).first()
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+    case = get_accessible_case(db, user, case_id)
 
     # Build trace result from stored data
     case_wallets = db.query(CaseWallet).filter_by(case_id=case_id).all()
@@ -452,22 +475,24 @@ dashboard_router = APIRouter(prefix="/api/v1/dashboard", tags=["Dashboard"])
 
 @dashboard_router.get("/stats")
 def get_dashboard_stats(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    total_cases = db.query(Case).count()
-    total_wallets = db.query(Wallet).count()
-    total_attributed = db.query(Case).filter(Case.status == "ATTRIBUTED").count()
-    total_syndicate = db.query(Case).filter(Case.possible_syndicate == True).count()
+    scoped = accessible_case_query(db, user)
+    scoped_ids = scoped.with_entities(Case.id).subquery()
+    total_cases = scoped.count()
+    total_wallets = db.query(CaseWallet).filter(CaseWallet.case_id.in_(db.query(scoped_ids.c.id))).count()
+    total_attributed = scoped.filter(Case.status.in_(["ATTRIBUTED", "escalated_to_vasp"])).count()
+    total_syndicate = scoped.filter(Case.possible_syndicate == True).count()
 
     # Cases by fraud type
-    fraud_type_counts = db.query(Case.fraud_typology, func.count(Case.id)).group_by(Case.fraud_typology).all()
+    fraud_type_counts = scoped.with_entities(Case.fraud_typology, func.count(Case.id)).group_by(Case.fraud_typology).all()
 
     # Cases by status
-    status_counts = db.query(Case.status, func.count(Case.id)).group_by(Case.status).all()
+    status_counts = scoped.with_entities(Case.status, func.count(Case.id)).group_by(Case.status).all()
 
     # Cases by risk tier
-    risk_counts = db.query(Case.risk_tier, func.count(Case.id)).group_by(Case.risk_tier).all()
+    risk_counts = scoped.with_entities(Case.risk_tier, func.count(Case.id)).group_by(Case.risk_tier).all()
 
     # Total loss tracked
-    total_loss = db.query(func.sum(Case.reported_loss_amount)).scalar() or 0
+    total_loss = scoped.with_entities(func.sum(Case.reported_loss_amount)).scalar() or 0
 
     return {
         "total_cases": total_cases,
