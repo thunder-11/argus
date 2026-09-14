@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_12_code_complete_checks_deferred`
+Overall status: `phase_12_complete`
 Last updated: 2026-09-14 Asia/Calcutta
-Current objective: Phase 12 frontend contract integration is implemented; all requested verification is explicitly deferred.
+Current objective: Phase 12 frontend contract integration and its deferred verification are complete.
 
 ## Phase Tracker
 
@@ -29,7 +29,7 @@ Current objective: Phase 12 frontend contract integration is implemented; all re
 | 9 | ML Inference, Explainability, and Human Review | complete | `3a4d2fc46a9f43b8d6d10fe59db42a57e50466bd` | verified on `origin/sih26183/implementation` | Hash-verified fresh-model serving, explicit abstention, evidence explanations, immutable reviews, and controlled lifecycle operations. |
 | 10 | Real-Time Status, Monitoring, and Alerts | complete | `f078ee0cc18f95076adc05b8b5daf29c4818e0d5` | verified on `origin/sih26183/implementation` | Durable status events, SSE replay, job controls, and deduplicated alert state. |
 | 11 | Reports, Evidence, and Investigator Operations | complete | `dcf510ca8d6b96c0007503f83e51dcae544b9a51` | verified on `origin/sih26183/implementation` | Immutable report revisions/manifests, scoped search/audit, settings, and reviewed notice operations. |
-| 12 | Existing Frontend Integration | implementation_complete_checks_deferred | `72376b3` | push completed; validation deferred | API integration only, no frontend redesign; no Phase 12 checks were run at the user's direction. |
+| 12 | Existing Frontend Integration | complete | `72376b3` | implementation pushed; completion record pending | API integration only, no frontend redesign. Frontend contracts, lint, production build, backend regression, and non-mutating browser smoke pass. |
 | 13 | Operational Hardening and Release | not_started | pending | pending | Final regression, docs, deployment, and SIH demo readiness. |
 
 ## Baseline Findings
@@ -205,8 +205,11 @@ Recorded before implementation:
 | Replace fabricated investigation findings | done | Money trail, graph, wallet dossier, cross-chain, overview, analytics, entities, alerts, reports, status, settings, and command search render server responses or explicit loading, empty, unavailable, restricted, partial, error, and unknown states. |
 | Preserve routes and legacy page exports | done | Existing routes remain unchanged; legacy case, dashboard, and VASP page exports delegate to their integrated counterparts rather than retaining synthetic parallel interfaces. |
 | Add lightweight frontend contract helpers | done | Shared response normalization and error extraction isolate compatibility wrappers and prevent fabricated zero/default values; a focused contract test file is included for later execution. |
-| Verify Phase 12 | deferred_by_user | Per explicit instruction on 2026-09-14, no lint, build, unit/contract, backend, browser, API, or other Phase 12 checks were run or restarted. |
-| Finalize/push Phase 12 | done_with_checks_deferred | Implementation commit `72376b3` was pushed to `origin/sih26183/implementation`. |
+| Verify frontend contracts | done | `npm test` passed all 3 focused response-normalization contract tests. |
+| Verify frontend production checks | done | `npm run lint` exited 0 with advisory existing/component warnings; `npm run build` completed 257 modules. The 568.81 kB main bundle remains above Vite's advisory 500 kB chunk threshold. |
+| Verify backend regression | done | `python -m pytest -p no:cacheprovider --basetemp E:\\Ali\\Crypto\\.tmp\\phase12-regression -q` passed 73 tests; one explicitly credential-gated live provider smoke was skipped; one known TestClient deprecation warning remains. |
+| Verify non-mutating browser smoke | done | Against an isolated fixture backend with matching local CORS origin, fixture login, intake form, temporal graph controls/empty state, wallet-risk input state, and report-history empty state rendered successfully. State-changing intake/report generation was intentionally not invoked. |
+| Finalize/push Phase 12 | pending | Implementation commit `72376b3` is pushed; update this record after the verification-progress commit is pushed. |
 
 ## Requirement Coverage Map
 
@@ -329,8 +332,10 @@ Rules to enforce during ML phases:
 | 2026-09-13 | `python -m pytest -p no:cacheprovider -q`; focused status-operation tests; OpenAPI and compile checks | 70 tests passed, one credential-gated provider live smoke was skipped, and the existing TestClient warning remains. The migration chain stays at `20260913_0005`; version `1.10.0-phase10` exposes 63 paths. |
 | 2026-09-13 | Re-read Phase 11 plan/PRD requirements and inspected existing report, notice, evidence, audit, search, settings, authorization, and frontend-consumer contracts | Restricted changes to Phase 11 and preserved the legacy report/notice entry points through additive contracts. |
 | 2026-09-13 | `python -m pytest -p no:cacheprovider -q`; Python compile; Alembic head; dependency and OpenAPI checks | 73 tests passed, one credential-gated live provider smoke skipped, and one known TestClient warning remains. Migration head remains `20260913_0005`; dependencies are consistent; version `1.11.0-phase11` exposes 73 paths. |
-| 2026-09-14 | Read the Phase 12 plan/PRD frontend requirements, progress tracker, and current frontend/backend contracts; updated API bindings, contexts, existing pages, and legacy page exports | Implemented server-backed frontend integration without changing the route map or visual design. At the user's explicit direction, no Phase 12 checks, test commands, browser smoke, server restart, or other validation was run. |
-| 2026-09-14 | `git commit -m "Implement SIH26183 Phase 12 frontend integration"`; `git push origin sih26183/implementation` | Created and pushed implementation commit `72376b3`; verification remains deliberately deferred with the rest of the Phase 12 checks. |
+| 2026-09-14 | Read the Phase 12 plan/PRD frontend requirements, progress tracker, and current frontend/backend contracts; updated API bindings, contexts, existing pages, and legacy page exports | Implemented server-backed frontend integration without changing the route map or visual design. Verification was initially deferred at the user's request. |
+| 2026-09-14 | `git commit -m "Implement SIH26183 Phase 12 frontend integration"`; `git push origin sih26183/implementation` | Created and pushed implementation commit `72376b3`. |
+| 2026-09-14 | `npm test`; `npm run lint`; `npm run build`; `python -m pytest -p no:cacheprovider --basetemp E:\\Ali\\Crypto\\.tmp\\phase12-regression -q` | Contract tests: 3 passed. Lint exited 0 with advisory component warnings. Production build completed 257 modules with a 568.81 kB chunk-size advisory. Backend regression: 73 passed, 1 credential-gated live-provider smoke skipped, 1 known TestClient deprecation warning. |
+| 2026-09-14 | Isolated local fixture browser smoke using matching backend CORS origin and preview origin | Fixture login, intake form, graph temporal controls/empty state, wallet-risk input state, and reports empty state rendered successfully. No state-changing intake or report-generation request was issued. |
 
 ## Phase Completion Log
 
@@ -349,4 +354,4 @@ Rules to enforce during ML phases:
 - 2026-09-13: Phase 9 completed. Hash-verified fresh linear-package serving pins feature/run cutoffs, emits calibrated advisory-only predictions with local log-odds explanations and evidence references, and explicitly abstains for unavailable, incompatible, incomplete, or out-of-distribution inputs without a legacy fallback. Immutable analyst reviews preserve original probabilities and audit operational overrides. Append-only lifecycle events support shadow/canary/production/retirement/rollback with approval, separation-of-duties, compatibility, and prior-prediction preservation checks. Implementation commit `3a4d2fc46a9f43b8d6d10fe59db42a57e50466bd` was pushed and verified on GitHub.
 - 2026-09-13: Phase 10 completed. Case status now exposes durable job state, attempts, errors, next retry, event-stream location and poll guidance. Authorized clients can cancel/retry case jobs; immutable run-progress rows stream through SSE with Last-Event-ID replay and heartbeat framing. Alert creation is fingerprint-deduplicated and recipient state remains separate. Full regression passed. Implementation commit `f078ee0cc18f95076adc05b8b5daf29c4818e0d5` was pushed and verified on GitHub.
 - 2026-09-13: Phase 11 completed. Generated reports now create immutable report revisions and canonical evidence manifests with separate content/PDF digests, report-event cutoff metadata, source references, temporal separation, limitations, and audit events. Authorized report history/manifest/download/verification, scoped case/wallet/hash search, filtered admin audit logs, append-only nonsecret policy settings, and reviewed/simulated-only notice dispatch contracts are available. Automatic court-certification and unsupported notice-attribution claims were removed while compatibility entry points remain. Implementation commit `dcf510ca8d6b96c0007503f83e51dcae544b9a51` was pushed and verified on GitHub.
-- 2026-09-14: Phase 12 code integration was implemented and pushed as `72376b3`. The frontend now consumes the implemented authentication, intake, case, graph, transaction, risk, entity, alert, report, status, settings, and search contracts with explicit non-fabricated states. Per the user's direction, all Phase 12 verification remains deferred; this phase must not be treated as validation-complete until those checks are later run.
+- 2026-09-14: Phase 12 completed. Implementation commit `72376b3` integrates the existing frontend with implemented authentication, intake, case, graph, transaction, risk, entity, alert, report, status, settings, and search contracts while preserving routes and visual design. Three focused frontend contract tests, lint, a 257-module production build, and the 73-test backend regression passed; one provider live smoke remains credential-gated. A non-mutating browser smoke passed against isolated fixture services with matching CORS origins.
