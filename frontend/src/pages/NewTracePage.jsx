@@ -1,26 +1,30 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import { errorMessage } from '../contracts';
+
+const DEMO_ENABLED = import.meta.env.VITE_DEMO_ENABLED === 'true';
 
 export default function NewTracePage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('manual'); // 'manual' or 'complaint'
   const [address, setAddress] = useState('');
   const [chain, setChain] = useState('');
-  const [hops, setHops] = useState(4);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   // Complaint form state
   const [complaint, setComplaint] = useState({
     complaint_source: 'ncrp',
-    external_complaint_id: `NCRP-2026-${Math.floor(10000 + Math.random() * 90000)}`,
+    external_complaint_id: '',
     victim_name: '',
     victim_phone: '',
     fraud_typology: 'TASK_BASED_SCAM',
     reported_loss_amount: '',
     loss_currency: 'USDT',
     complaint_text: '',
+    victim_reported_at: '',
+    receipt_reference: '',
   });
 
   const autoDetectChain = (addr) => {
@@ -42,26 +46,19 @@ export default function NewTracePage() {
     setLoading(true);
 
     try {
-      // Create a quick case
+      await api.post('/api/v1/wallets/validate', { address, chain: chain || null });
       const complaintRes = await api.post('/api/v1/complaints', {
         complaint_source: 'manual_fir',
-        external_complaint_id: `MANUAL-${Date.now()}`,
+        external_complaint_id: `MANUAL-${crypto.randomUUID()}`,
         fraud_typology: 'TASK_BASED_SCAM',
         reported_loss_amount: 0,
-        suspect_wallets: [{ address, chain: chain || 'ETH' }],
-      });
+        suspect_wallets: [{ address, chain: chain || null }],
+        auto_start: true,
+      }, { headers: { 'Idempotency-Key': crypto.randomUUID() } });
       const caseId = complaintRes.data.case_id;
-
-      // Execute trace
-      await api.post(`/api/v1/cases/${caseId}/trace`, {
-        start_wallet: address,
-        chain: chain || 'ETH',
-        max_hops: hops,
-      });
-
-      navigate(`/case/${caseId}`);
+      navigate(`/case/${caseId}?case=${caseId}`);
     } catch (err) {
-      setError(err.response?.data?.detail || err.response?.data?.message || 'Trace failed');
+      setError(errorMessage(err, 'Trace failed'));
     } finally {
       setLoading(false);
     }
@@ -73,23 +70,21 @@ export default function NewTracePage() {
     setLoading(true);
 
     try {
+      if (!complaint.external_complaint_id.trim()) throw new Error('Complaint ID is required');
+      await api.post('/api/v1/wallets/validate', { address, chain: chain || null });
       const res = await api.post('/api/v1/complaints', {
         ...complaint,
         reported_loss_amount: parseFloat(complaint.reported_loss_amount) || 0,
-        suspect_wallets: [{ address, chain: chain || 'TRON', token_symbol: complaint.loss_currency }],
-      });
+        victim_reported_at: complaint.victim_reported_at || null,
+        receipt_reference: complaint.receipt_reference || null,
+        suspect_wallets: [{ address, chain: chain || null, token_symbol: complaint.loss_currency }],
+        data_mode: DEMO_ENABLED ? 'fixture' : 'live',
+        auto_start: true,
+      }, { headers: { 'Idempotency-Key': crypto.randomUUID() } });
       const caseId = res.data.case_id;
-
-      // Auto-trigger trace
-      await api.post(`/api/v1/cases/${caseId}/trace`, {
-        start_wallet: address,
-        chain: chain || 'TRON',
-        max_hops: hops,
-      });
-
-      navigate(`/case/${caseId}`);
+      navigate(`/case/${caseId}?case=${caseId}`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Submission failed');
+      setError(errorMessage(err, 'Submission failed'));
     } finally {
       setLoading(false);
     }
@@ -100,13 +95,15 @@ export default function NewTracePage() {
     setChain('TRON');
     setComplaint({
       ...complaint,
-      external_complaint_id: 'NCRP-2026-DEMO-' + Math.floor(1000 + Math.random() * 9000),
+      external_complaint_id: `NCRP-DEMO-${crypto.randomUUID()}`,
       victim_name: 'Rajesh Kumar',
       victim_phone: '+91-9876543210',
       fraud_typology: 'TASK_BASED_SCAM',
       reported_loss_amount: '12500',
       loss_currency: 'USDT',
       complaint_text: 'Victim was lured via Telegram task-fraud app promising 30% daily returns for rating hotels on Google Maps. Transferred 12,500 USDT to suspect TRON wallet.',
+      victim_reported_at: new Date().toISOString(),
+      receipt_reference: 'SIMULATED-NCRP-RECEIPT',
     });
     setMode('complaint');
   };
@@ -118,9 +115,9 @@ export default function NewTracePage() {
           <h1>🔍 New Blockchain Trace</h1>
           <p className="subtitle">Enter a suspect wallet address to begin real-time attribution</p>
         </div>
-        <button className="btn btn-success" onClick={loadDemoCase}>
+        {DEMO_ENABLED && <button className="btn btn-success" onClick={loadDemoCase}>
           🎯 Load Demo Scenario
-        </button>
+        </button>}
       </div>
 
       {/* Mode Toggle */}
@@ -129,7 +126,7 @@ export default function NewTracePage() {
           ⚡ Quick Trace
         </button>
         <button className={`btn ${mode === 'complaint' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setMode('complaint')}>
-          📋 Simulate NCRP / 1930 Complaint
+          📋 NCRP / 1930 Complaint
         </button>
       </div>
 
@@ -144,7 +141,7 @@ export default function NewTracePage() {
           </span>}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div>
           <div className="form-group">
             <label>Blockchain Network</label>
             <select className="form-select" value={chain} onChange={e => setChain(e.target.value)}>
@@ -153,14 +150,8 @@ export default function NewTracePage() {
               <option value="ETH">Ethereum (ERC-20)</option>
               <option value="BSC">BSC (BEP-20)</option>
               <option value="BTC">Bitcoin</option>
+              <option value="POLYGON">Polygon</option>
             </select>
-          </div>
-          <div className="form-group">
-            <label>Max Hop Depth</label>
-            <div className="slider-group">
-              <input type="range" min="1" max="6" value={hops} onChange={e => setHops(parseInt(e.target.value))} />
-              <span className="slider-value">{hops}</span>
-            </div>
           </div>
         </div>
 
@@ -222,6 +213,20 @@ export default function NewTracePage() {
               <textarea className="form-textarea" value={complaint.complaint_text}
                 onChange={e => setComplaint({ ...complaint, complaint_text: e.target.value })}
                 placeholder="Describe how the fraud occurred..." rows={3} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group">
+                <label>Victim Report Receipt Time (ISO-8601 with offset)</label>
+                <input className="form-input mono" value={complaint.victim_reported_at}
+                  onChange={e => setComplaint({ ...complaint, victim_reported_at: e.target.value })}
+                  placeholder="2026-09-13T10:15:00+05:30" />
+              </div>
+              <div className="form-group">
+                <label>Receipt Reference</label>
+                <input className="form-input mono" value={complaint.receipt_reference}
+                  onChange={e => setComplaint({ ...complaint, receipt_reference: e.target.value })}
+                  placeholder="NCRP receipt / diary reference" />
+              </div>
             </div>
           </>
         )}

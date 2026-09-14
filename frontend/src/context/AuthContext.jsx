@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api';
+import api, { clearSession, readSession, saveSession } from '../api';
 
 const AuthContext = createContext(null);
 
@@ -10,11 +10,20 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const stored = localStorage.getItem('cfas_user');
-    if (stored) {
-      try { setUser(JSON.parse(stored)); } catch { /* ignore */ }
-    }
-    setLoading(false);
+    let active = true;
+    const restore = async () => {
+      if (!readSession().accessToken) { setLoading(false); return; }
+      try {
+        const response = await api.get('/api/v1/auth/me');
+        if (active) setUser(response.data);
+      } catch {
+        clearSession();
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    restore();
+    return () => { active = false; };
   }, []);
 
   // Listen for 401 events from the API interceptor — navigate without hard reload
@@ -29,16 +38,15 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const res = await api.post('/api/v1/auth/login', { email, password });
-    const { access_token, user: userData } = res.data;
-    localStorage.setItem('cfas_token', access_token);
-    localStorage.setItem('cfas_user', JSON.stringify(userData));
+    const { user: userData } = res.data;
+    saveSession(res.data);
     setUser(userData);
     return userData;
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('cfas_token');
-    localStorage.removeItem('cfas_user');
+  const logout = useCallback(async () => {
+    try { await api.post('/api/v1/auth/logout'); } catch { /* local sign-out still applies */ }
+    clearSession();
     setUser(null);
     navigate('/login', { replace: true });
   }, [navigate]);

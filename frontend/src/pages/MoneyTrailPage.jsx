@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { useCase } from '../context/CaseContext';
 import MoneyTrailVisualizer from '../components/MoneyTrailVisualizer';
 import api from '../api';
+import { errorMessage } from '../contracts';
+import { useAuth } from '../context/AuthContext';
 
 const TYPOLOGY_LABELS = {
   TASK_BASED_SCAM: '📱 Task-Based Scam',
@@ -16,8 +18,10 @@ const TYPOLOGY_LABELS = {
 
 export default function MoneyTrailPage() {
   const [searchParams] = useSearchParams();
-  const caseIdFromUrl = searchParams.get('case');
-  const { activeCaseId, selectCase, activeCase, activeGraph, casesList, reloadActiveCase } = useCase();
+  const { caseId: caseIdFromPath } = useParams();
+  const caseIdFromUrl = caseIdFromPath || searchParams.get('case');
+  const { activeCaseId, selectCase, activeCase, activeGraph, casesList, reloadActiveCase, caseError, graphState } = useCase();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [currentHop, setCurrentHop] = useState(0);
@@ -35,7 +39,7 @@ export default function MoneyTrailPage() {
     }
   }, [caseIdFromUrl, activeCaseId, selectCase]);
 
-  const targetCaseId = activeCaseId || 'case-demo-001';
+  const targetCaseId = activeCaseId;
 
   // Structured Hops
   const structuredHops = useMemo(() => {
@@ -56,17 +60,13 @@ export default function MoneyTrailPage() {
       const isBridge = targetNode.node_type === 'BRIDGE' || edge.is_bridge_tx;
       const isPeeling = edge.is_peeling;
 
-      let hopConfidence = Math.min(60 + (idx + 1) * 7, 96);
-      if (isTerminal) hopConfidence = 96;
-      if (targetNode.attribution_tier === 'TIER_3_CLUSTER') hopConfidence = 68;
-
       const evidence = [];
-      if (idx === 0) evidence.push('Direct origin transfer from reported victim wallet');
-      if (isPeeling) evidence.push('Peeling chain algorithm matched (asymmetric >80% value split)');
-      if (isMixer) evidence.push('Funds routed through privacy mixer');
-      if (isBridge) evidence.push('Cross-chain bridge protocol swap');
-      if (isTerminal) evidence.push(`Known ${targetNode.vasp_name || 'VASP'} deposit address match (FIU-IND)`);
-      if (!evidence.length) evidence.push('Layering mule wallet in transactional chain');
+      evidence.push(`Backend-validated transfer ${edge.tx_hash}`);
+      if (edge.temporal_partition) evidence.push(`Temporal partition: ${edge.temporal_partition}`);
+      if (isPeeling) evidence.push('Deterministic peeling finding attached to this transfer');
+      if (isMixer) evidence.push('Reviewed privacy-protocol label attached to destination');
+      if (isBridge) evidence.push('Supported bridge evidence attached to this transfer');
+      if (isTerminal) evidence.push(`Reviewed ${targetNode.vasp_name || 'VASP'} attribution attached to destination`);
 
       return {
         index: idx,
@@ -75,16 +75,16 @@ export default function MoneyTrailPage() {
         to: edge.target,
         amount: edge.amount || 0,
         token: edge.token || 'USDT',
-        amountUsd: edge.amount || 0,
+        amountUsd: null,
         chain: sourceNode.chain || targetNode.chain || 'TRON',
         targetChain: targetNode.chain || sourceNode.chain || 'TRON',
-        txHash: edge.tx_hash || 'SYN_TX_' + idx,
-        timestamp: edge.timestamp ? edge.timestamp.substring(0, 19).replace('T', ' ') : 'N/A',
+        txHash: edge.tx_hash,
+        timestamp: edge.timestamp ? edge.timestamp.substring(0, 19).replace('T', ' ') : 'Unknown',
         fromNode: sourceNode,
         toNode: targetNode,
         isPeeling,
         isBridge,
-        confidence: hopConfidence,
+        confidence: targetNode.attribution_score ?? null,
         evidence,
       };
     });
@@ -115,10 +115,10 @@ export default function MoneyTrailPage() {
 
   // Execute Trace Trigger with complete state machine starting from Node 0
   const handleRunTrace = async () => {
+    if (!targetCaseId) return;
     setTraceStatus('starting');
     setTraceError(null);
     try {
-      await new Promise(r => setTimeout(r, 200));
       setTraceStatus('loading');
       
       await api.post(`/api/v1/cases/${targetCaseId}/trace`, {});
@@ -131,7 +131,7 @@ export default function MoneyTrailPage() {
     } catch (err) {
       console.error('Trace error:', err);
       setTraceStatus('error');
-      setTraceError(err.response?.data?.detail || err.message || 'Trace failed due to network or wallet error');
+      setTraceError(errorMessage(err, 'Trace failed due to a provider or wallet error'));
     }
   };
 
@@ -140,11 +140,11 @@ export default function MoneyTrailPage() {
     setGenerating('notice');
     try {
       const res = await api.post(`/api/v1/cases/${targetCaseId}/generate-freeze-notice`, {
-        vasp_id: vaspNode?.vasp_id || 'vasp-coindcx',
-        police_station: 'Cyber Crime Police Station, Bengaluru Central',
-        officer_name: 'Inspector S. Sharma',
-        fir_cr_number: activeCase?.external_complaint_id || 'NCRP-2026-88421',
-        designation: 'Investigating Officer',
+        vasp_id: vaspNode?.vasp_id,
+        police_station: user?.police_station,
+        officer_name: user?.full_name,
+        fir_cr_number: activeCase?.external_complaint_id,
+        designation: user?.role,
       });
 
       const b64 = res.data.pdf_base64;
@@ -208,10 +208,10 @@ export default function MoneyTrailPage() {
   };
 
   const summaryMetrics = useMemo(() => {
-    const totalFunds = structuredHops[0]?.amountUsd || activeCase?.reported_loss_amount || 0;
+    const totalFunds = activeGraph?.summary?.selected_amount ?? null;
     const chainsSet = new Set(structuredHops.map(h => h.chain));
     const entitiesCount = (activeGraph.nodes || []).length;
-    const finalConfidence = structuredHops[structuredHops.length - 1]?.confidence || (hasAttribution ? 96 : 45);
+    const finalConfidence = structuredHops[structuredHops.length - 1]?.confidence ?? null;
 
     return {
       totalFunds,
@@ -221,7 +221,7 @@ export default function MoneyTrailPage() {
       confidence: finalConfidence,
       token: structuredHops[0]?.token || 'USDT',
     };
-  }, [structuredHops, activeCase, activeGraph, hasAttribution]);
+  }, [structuredHops, activeGraph]);
 
   // Button label according to state machine
   const getTraceButtonLabel = () => {
@@ -286,7 +286,7 @@ export default function MoneyTrailPage() {
       </div>
 
       {/* Error Banner */}
-      {traceError && (
+      {(traceError || caseError) && (
         <div style={{
           padding: '12px 16px', background: 'rgba(189, 74, 74, 0.15)',
           border: '1px solid var(--border-crimson)', borderRadius: 'var(--radius-sm)',
@@ -296,12 +296,18 @@ export default function MoneyTrailPage() {
             <span style={{ fontSize: '1.2rem' }}>⚠️</span>
             <div>
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#E57373' }}>Trace Error Encountered</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{traceError}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{traceError || caseError}</div>
             </div>
           </div>
           <button className="btn btn-danger" onClick={handleRunTrace} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
             Retry Trace
           </button>
+        </div>
+      )}
+
+      {['partial', 'unavailable', 'not_traced'].includes(graphState) && (
+        <div className="card" style={{ padding: 12, color: 'var(--accent-amber)' }}>
+          Evidence coverage is {graphState.replace('_', ' ')}. Displayed totals include only backend-validated transfers.
         </div>
       )}
 
@@ -455,7 +461,7 @@ export default function MoneyTrailPage() {
                   <div className="dossier-card">
                     <div className="dossier-label">REPORTED THEFT LOSS</div>
                     <div className="dossier-val" style={{ color: 'var(--accent-copper-light)', fontFamily: 'var(--font-mono)' }}>
-                      ${originNode.amount?.toLocaleString()} {originNode.token}
+                      {originNode.amount ?? 'Unknown'} {originNode.token || ''}
                     </div>
                   </div>
                   <div className="dossier-card">
@@ -506,13 +512,13 @@ export default function MoneyTrailPage() {
                   <div className="dossier-card">
                     <div className="dossier-label">TRANSFER AMOUNT</div>
                     <div className="dossier-val" style={{ color: 'var(--accent-copper-light)', fontFamily: 'var(--font-mono)' }}>
-                      ${currentHopData.amountUsd?.toLocaleString()} {currentHopData.token}
+                      {currentHopData.amount ?? 'Unknown'} {currentHopData.token || ''}
                     </div>
                   </div>
                   <div className="dossier-card">
                     <div className="dossier-label">CONFIDENCE</div>
                     <div className="dossier-val" style={{ color: currentHopData.confidence >= 80 ? 'var(--accent-gold)' : 'var(--accent-amber)', fontFamily: 'var(--font-mono)' }}>
-                      {currentHopData.confidence}%
+                      {currentHopData.confidence === null ? 'Not assessed' : `${currentHopData.confidence}%`}
                     </div>
                   </div>
                 </div>
@@ -569,7 +575,7 @@ export default function MoneyTrailPage() {
                   {vaspNode.vasp_name}
                 </div>
                 <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginBottom: 10 }}>
-                  Deposit cluster match with {summaryMetrics.confidence}% statutory certainty.
+                  Reviewed attribution evidence. Confidence is {summaryMetrics.confidence === null ? 'not available' : `${summaryMetrics.confidence}%`} and is not legal certainty.
                 </div>
                 {vaspNode.nodal_email && (
                   <div style={{ background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)', fontSize: '0.75rem' }}>
@@ -589,7 +595,7 @@ export default function MoneyTrailPage() {
       <div className="telemetry-strip">
         <div className="telemetry-metric copper">
           <span className="metric-label">TOTAL FUNDS TRACED</span>
-          <span className="metric-value">${summaryMetrics.totalFunds.toLocaleString()}</span>
+          <span className="metric-value">{summaryMetrics.totalFunds ?? 'Unknown'} {summaryMetrics.token || ''}</span>
         </div>
         <div className="telemetry-metric">
           <span className="metric-label">HOPS TRAVERSED</span>
@@ -605,7 +611,7 @@ export default function MoneyTrailPage() {
         </div>
         <div className="telemetry-metric gold">
           <span className="metric-label">ATTRIBUTION CONFIDENCE</span>
-          <span className="metric-value">{summaryMetrics.confidence}%</span>
+          <span className="metric-value">{summaryMetrics.confidence === null ? 'Not assessed' : `${summaryMetrics.confidence}%`}</span>
         </div>
       </div>
     </div>

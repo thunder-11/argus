@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { errorMessage } from '../contracts';
+
+const DEMO_ENABLED = import.meta.env.VITE_DEMO_ENABLED === 'true';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -18,7 +21,7 @@ export default function LoginPage() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed');
+      setError(errorMessage(err, 'Login failed'));
     } finally {
       setLoading(false);
     }
@@ -32,7 +35,7 @@ export default function LoginPage() {
       await login(email, 'cfas2026');
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed');
+      setError(errorMessage(err, 'Login failed'));
     } finally {
       setLoading(false);
     }
@@ -68,7 +71,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div style={{ marginTop: 24, borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
+        {DEMO_ENABLED && <div style={{ marginTop: 24, borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '0.6px', marginBottom: 10, textAlign: 'center' }}>QUICK ROLE ACCESS</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button className="btn btn-outline" style={{ width: '100%', justifyContent: 'center', fontSize: '0.8rem' }}
@@ -84,7 +87,7 @@ export default function LoginPage() {
               🛡️ Superintendent Verma (Command Admin)
             </button>
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );

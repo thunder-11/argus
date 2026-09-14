@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+import { collection, errorMessage } from '../contracts';
 
 export default function EntitiesPage() {
   const [vasps, setVasps] = useState([]);
@@ -7,6 +8,7 @@ export default function EntitiesPage() {
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [activeTypeFilter, setActiveTypeFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchEntities();
@@ -14,14 +16,10 @@ export default function EntitiesPage() {
 
   const fetchEntities = async () => {
     try {
-      const [vaspRes, addrRes] = await Promise.all([
-        api.get('/api/v1/vasp/directory'),
-        api.get('/api/v1/vasp/addresses'),
-      ]);
-      setVasps(vaspRes.data.vasps || []);
-      setAddresses(addrRes.data.addresses || []);
+      const response = await api.get('/api/v1/entities');
+      setVasps(collection(response.data, 'entities').map(item => ({ ...item, vasp_name: item.canonical_name, legal_entity_name: item.legal_name, nodal_officer_email: item.contact_email })));
     } catch (err) {
-      console.error(err);
+      setError(errorMessage(err, 'Entity directory is unavailable.'));
     } finally {
       setLoading(false);
     }
@@ -30,8 +28,15 @@ export default function EntitiesPage() {
   const filteredVasps = activeTypeFilter === 'ALL'
     ? vasps
     : activeTypeFilter === 'FIU'
-    ? vasps.filter(v => v.is_fiu_ind_registered)
-    : vasps.filter(v => !v.is_fiu_ind_registered);
+    ? vasps.filter(v => v.fiu_status === 'registered')
+    : vasps.filter(v => v.fiu_status !== 'registered');
+
+  const selectEntity = async id => {
+    if (id === selectedEntity) { setSelectedEntity(null); setAddresses([]); return; }
+    setSelectedEntity(id);
+    try { const response = await api.get(`/api/v1/entities/${id}`); setAddresses((response.data.labels || []).map(label => ({ ...label, vasp_id: id, address_tag: label.label, is_verified: label.review_status === 'reviewed' }))); }
+    catch (requestError) { setAddresses([]); setError(errorMessage(requestError, 'Entity labels are unavailable.')); }
+  };
 
   if (loading) {
     return <div className="loading-overlay"><div className="spinner"></div><p>Loading Entity Directory...</p></div>;
@@ -46,6 +51,7 @@ export default function EntitiesPage() {
           <p className="subtitle">FIU-IND Registered VASPs, Global Exchanges, Mixers & Bridge Protocols</p>
         </div>
       </div>
+      {error && <div className="card" style={{ padding: 12 }}>{error}</div>}
 
       {/* Filter Toolbar */}
       <div className="card" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
@@ -90,20 +96,20 @@ export default function EntitiesPage() {
               {filteredVasps.map(v => (
                 <tr
                   key={v.id}
-                  onClick={() => setSelectedEntity(v.id === selectedEntity ? null : v.id)}
+                  onClick={() => selectEntity(v.id)}
                   style={{ cursor: 'pointer', background: selectedEntity === v.id ? 'rgba(200, 109, 59, 0.08)' : 'transparent' }}
                 >
                   <td style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{v.vasp_name}</td>
                   <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{v.legal_entity_name || '—'}</td>
                   <td>
-                    {v.is_fiu_ind_registered
+                    {v.fiu_status === 'registered'
                       ? <span className="badge badge-fiu">🇮🇳 FIU REGISTERED</span>
-                      : <span className="badge badge-low">NON-REGISTERED</span>}
+                      : <span className="badge badge-low">{(v.fiu_status || 'UNKNOWN').toUpperCase()}</span>}
                   </td>
                   <td>{v.jurisdiction}</td>
                   <td className="mono" style={{ color: 'var(--accent-copper-light)' }}>{v.nodal_officer_email}</td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 800 }}>
-                    {v.sla_freeze_hours ? `${v.sla_freeze_hours} hrs` : '—'}
+                    Not asserted
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <span className="badge badge-info">{v.address_count}</span>

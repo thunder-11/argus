@@ -1,26 +1,28 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   ReactFlow, Controls, Background, MiniMap,
-  MarkerType, useNodesState, useEdgesState,
+  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCase } from '../context/CaseContext';
 
 export default function TransactionGraphPage() {
-  const { activeCase, activeGraph, casesList, selectCase } = useCase();
+  const { activeGraph, graphFilters, setGraphFilters, graphState, caseError } = useCase();
   const [selectedEntityFilter, setSelectedEntityFilter] = useState('ALL');
   const [selectedNode, setSelectedNode] = useState(null);
   const navigate = useNavigate();
 
   // Layout Nodes & Edges
   const { nodes, edges } = useMemo(() => {
-    if (!activeGraph?.nodes?.length) return { nodes: [], edges: [] };
+    const graphNodes = [...(activeGraph?.nodes || []), ...(activeGraph?.context_nodes || []).map(node => ({ ...node, context_only: true }))];
+    const graphEdges = [...(activeGraph?.edges || []), ...(activeGraph?.context_edges || []).map(edge => ({ ...edge, context_only: true }))];
+    if (!graphNodes.length) return { nodes: [], edges: [] };
 
     // Filter nodes based on selectedEntityFilter
     const filteredRawNodes = selectedEntityFilter === 'ALL'
-      ? activeGraph.nodes
-      : activeGraph.nodes.filter(n => {
+      ? graphNodes
+      : graphNodes.filter(n => {
           if (selectedEntityFilter === 'VASP') return n.node_type?.includes('VASP');
           if (selectedEntityFilter === 'MIXER') return n.node_type === 'MIXER';
           if (selectedEntityFilter === 'BRIDGE') return n.node_type === 'BRIDGE';
@@ -88,6 +90,7 @@ export default function TransactionGraphPage() {
         style: {
           background: bgColor,
           border: `1.5px solid ${borderColor}`,
+          opacity: n.context_only ? 0.45 : 1,
           borderRadius: 8,
           padding: 6,
           minWidth: 160,
@@ -97,15 +100,15 @@ export default function TransactionGraphPage() {
     });
 
     const filteredNodeIds = new Set(filteredRawNodes.map(n => n.id));
-    const flowEdges = (activeGraph.edges || [])
+    const flowEdges = graphEdges
       .filter(e => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target))
       .map(e => ({
         id: e.id,
         source: e.source,
         target: e.target,
-        label: `${e.amount?.toLocaleString()} ${e.token || ''}`,
+        label: `${e.amount ?? 'Unknown'} ${e.token || ''}`,
         animated: true,
-        style: { stroke: e.is_peeling ? '#D9943B' : '#C86D3B', strokeWidth: 2.5 },
+        style: { stroke: e.context_only ? '#5A6474' : e.is_peeling ? '#D9943B' : '#C86D3B', strokeWidth: 2.5, opacity: e.context_only ? 0.45 : 1 },
         labelStyle: { fill: '#EDECE6', fontSize: 10, fontWeight: 700, fontFamily: 'JetBrains Mono' },
         labelBgStyle: { fill: '#10141C', fillOpacity: 0.95 },
         labelBgPadding: [6, 4],
@@ -154,7 +157,30 @@ export default function TransactionGraphPage() {
         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
           Showing <strong>{nodes.length}</strong> Nodes • <strong>{edges.length}</strong> Edges
         </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select className="form-select" value={graphFilters.temporal_view}
+            onChange={e => setGraphFilters(current => ({ ...current, temporal_view: e.target.value }))}>
+            <option value="post_report">Post-report</option>
+            <option value="pre_report">Pre-report</option>
+            <option value="all">All evidence</option>
+          </select>
+          <select className="form-select" value={graphFilters.boundary}
+            onChange={e => setGraphFilters(current => ({ ...current, boundary: e.target.value }))}>
+            <option value="exclusive">After T0</option>
+            <option value="inclusive">At/after T0</option>
+          </select>
+          <label style={{ fontSize: '0.75rem' }}>
+            <input type="checkbox" checked={graphFilters.include_context}
+              onChange={e => setGraphFilters(current => ({ ...current, include_context: e.target.checked }))} /> Context
+          </label>
+        </div>
       </div>
+
+      {(caseError || ['partial', 'unavailable', 'not_traced'].includes(graphState)) && (
+        <div className="card" style={{ padding: 12, color: 'var(--accent-amber)' }}>
+          {caseError || `Evidence coverage is ${graphState.replace('_', ' ')}.`}
+        </div>
+      )}
 
       {/* Graph Area + Selected Node Inspector */}
       <div style={{ display: 'grid', gridTemplateColumns: selectedNode ? '1fr 340px' : '1fr', gap: 16 }}>
@@ -198,7 +224,7 @@ export default function TransactionGraphPage() {
               <div>
                 <div className="dossier-label">WALLET / CONTRACT ADDRESS</div>
                 <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--accent-copper-light)', wordBreak: 'break-all', marginTop: 2 }}>
-                  {selectedNode.id}
+                  {selectedNode.address || selectedNode.id}
                 </div>
               </div>
 
@@ -209,7 +235,7 @@ export default function TransactionGraphPage() {
                 </div>
                 <div className="dossier-card">
                   <div className="dossier-label">BLOCKCHAIN</div>
-                  <div className="dossier-val">{selectedNode.chain || 'TRON'}</div>
+                  <div className="dossier-val">{selectedNode.chain || 'Unknown'}</div>
                 </div>
               </div>
 
@@ -229,7 +255,7 @@ export default function TransactionGraphPage() {
 
               <button
                 className="btn btn-primary"
-                onClick={() => navigate(`/wallets?address=${selectedNode.id}&chain=${selectedNode.chain || 'TRON'}`)}
+                onClick={() => navigate(`/wallets?address=${encodeURIComponent(selectedNode.address || selectedNode.id)}&chain=${selectedNode.chain || ''}`)}
                 style={{ width: '100%', justifyContent: 'center', marginTop: 6 }}
               >
                 🔎 Deep-Dive Wallet Intelligence →

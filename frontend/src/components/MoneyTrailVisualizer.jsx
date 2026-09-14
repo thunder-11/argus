@@ -62,17 +62,12 @@ export default function MoneyTrailVisualizer({
       const isBridge = targetNode.node_type === 'BRIDGE' || edge.is_bridge_tx;
       const isPeeling = edge.is_peeling;
 
-      let hopConfidence = Math.min(60 + (idx + 1) * 7, 96);
-      if (isTerminal) hopConfidence = 96;
-      if (targetNode.attribution_tier === 'TIER_3_CLUSTER') hopConfidence = 68;
-
-      const evidence = [];
-      if (idx === 0) evidence.push('Direct origin transfer from reported victim wallet');
-      if (isPeeling) evidence.push('Peeling chain algorithm matched (asymmetric >80% value split)');
-      if (isMixer) evidence.push('Funds routed through privacy protocol / mixer');
-      if (isBridge) evidence.push('Cross-chain bridge swap protocol detected');
-      if (isTerminal) evidence.push(`Known ${targetNode.vasp_name || 'VASP'} deposit address match (FIU-IND database)`);
-      if (!evidence.length) evidence.push('Intermediary mule wallet hop in layering trail');
+      const evidence = [`Backend-validated transfer ${edge.tx_hash}`];
+      if (edge.temporal_partition) evidence.push(`Temporal partition: ${edge.temporal_partition}`);
+      if (isPeeling) evidence.push('Deterministic peeling finding attached');
+      if (isMixer) evidence.push('Reviewed privacy-protocol label attached');
+      if (isBridge) evidence.push('Supported bridge evidence attached');
+      if (isTerminal) evidence.push(`Reviewed ${targetNode.vasp_name || 'VASP'} attribution attached`);
 
       return {
         index: idx,
@@ -80,17 +75,17 @@ export default function MoneyTrailVisualizer({
         from: edge.source,
         to: edge.target,
         amount: edge.amount || 0,
-        token: edge.token || 'USDT',
-        amountUsd: edge.amount || 0,
-        chain: sourceNode.chain || targetNode.chain || 'TRON',
-        targetChain: targetNode.chain || sourceNode.chain || 'TRON',
-        txHash: edge.tx_hash || 'SYN_TX_' + idx,
-        timestamp: edge.timestamp ? edge.timestamp.substring(0, 19).replace('T', ' ') : 'N/A',
+        token: edge.token || edge.asset || null,
+        amountUsd: null,
+        chain: sourceNode.chain || targetNode.chain || edge.chain || 'UNKNOWN',
+        targetChain: targetNode.chain || sourceNode.chain || edge.chain || 'UNKNOWN',
+        txHash: edge.tx_hash,
+        timestamp: edge.timestamp ? edge.timestamp.substring(0, 19).replace('T', ' ') : 'Unknown',
         fromNode: sourceNode,
         toNode: targetNode,
         isPeeling,
         isBridge,
-        confidence: hopConfidence,
+        confidence: targetNode.attribution_score ?? null,
         evidence,
       };
     });

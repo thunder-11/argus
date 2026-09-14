@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCase } from '../context/CaseContext';
 import api from '../api';
+import { collection, errorMessage } from '../contracts';
 
 const TYPOLOGY_LABELS = {
   TASK_BASED_SCAM: '📱 Task-Based Scam',
@@ -18,17 +19,9 @@ export default function OverviewPage() {
   const [recentCases, setRecentCases] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const { selectCase } = useCase();
   const navigate = useNavigate();
-
-  // Simulated Live Activity Stream
-  const [liveStream, setLiveStream] = useState([
-    { time: '14:32:08', text: 'New suspect wallet intake submitted from NCRP portal', tag: 'INTAKE', type: 'info' },
-    { time: '14:32:11', text: 'TRON TRC-20 high-velocity peeling chain identified (Hop 2)', tag: 'PEELING', type: 'copper' },
-    { time: '14:32:14', text: 'High-risk privacy mixer contract interaction detected', tag: 'MIXER', type: 'crimson' },
-    { time: '14:32:18', text: 'Cross-chain bridge swap protocol triggered (TRON → BSC)', tag: 'BRIDGE', type: 'amber' },
-    { time: '14:32:22', text: 'VASP Deposit match confirmed: CoinDCX (FIU-IND Verified)', tag: 'ATTRIBUTION', type: 'gold' },
-  ]);
 
   useEffect(() => {
     const fetchOverviewData = async () => {
@@ -39,10 +32,10 @@ export default function OverviewPage() {
           api.get('/api/v1/alerts').catch(() => ({ data: { alerts: [] } })),
         ]);
         setStats(statsRes.data);
-        setRecentCases(casesRes.data.cases?.slice(0, 5) || []);
-        setAlerts(alertsRes.data.alerts?.slice(0, 4) || []);
+        setRecentCases(collection(casesRes.data, 'cases').slice(0, 5));
+        setAlerts(collection(alertsRes.data, 'alerts').slice(0, 5));
       } catch (err) {
-        console.error('Failed to load overview data:', err);
+        setError(errorMessage(err, 'Overview data is unavailable.'));
       } finally {
         setLoading(false);
       }
@@ -76,6 +69,7 @@ export default function OverviewPage() {
           </button>
         </div>
       </div>
+      {error && <div className="card" style={{ padding: 12, color: 'var(--accent-amber)' }}>{error}</div>}
 
       {/* Stats KPI Grid */}
       {stats && (
@@ -196,25 +190,26 @@ export default function OverviewPage() {
               <span className="badge badge-info" style={{ fontSize: '0.65rem' }}>REAL-TIME FEED</span>
             </div>
             <div className="panel-body" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {liveStream.map((item, idx) => (
-                <div key={idx} style={{
+              {alerts.map(item => (
+                <div key={item.id} style={{
                   display: 'flex', alignItems: 'flex-start', gap: 10,
                   padding: '10px 12px', background: 'var(--bg-secondary)',
                   borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)',
                 }}>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-                    {item.time}
+                    {item.created_at?.substring(11, 19) || '—'}
                   </span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                      {item.text}
+                      {item.title}
                     </div>
                   </div>
-                  <span className={`badge badge-${item.type === 'gold' ? 'fiu' : item.type === 'crimson' ? 'critical' : item.type === 'copper' ? 'info' : 'medium'}`} style={{ fontSize: '0.65rem' }}>
-                    {item.tag}
+                  <span className={`badge ${item.severity === 'CRITICAL' ? 'badge-critical' : 'badge-info'}`} style={{ fontSize: '0.65rem' }}>
+                    {item.alert_type || 'ALERT'}
                   </span>
                 </div>
               ))}
+              {!alerts.length && <div style={{ color: 'var(--text-muted)' }}>No durable activity alerts are available.</div>}
             </div>
           </div>
 

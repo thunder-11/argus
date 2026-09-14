@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCase } from '../context/CaseContext';
+import api from '../api';
+import { collection } from '../contracts';
 
 export default function CommandPalette() {
   const { isCommandPaletteOpen, setIsCommandPaletteOpen, casesList, selectCase } = useCase();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [serverCases, setServerCases] = useState([]);
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -16,6 +19,14 @@ export default function CommandPalette() {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isCommandPaletteOpen]);
+
+  useEffect(() => {
+    if (!isCommandPaletteOpen || query.trim().length < 2) { setServerCases([]); return; }
+    const controller = new AbortController();
+    const timer = setTimeout(() => api.get('/api/v1/search', { params: { q: query.trim() }, signal: controller.signal })
+      .then(response => setServerCases(collection(response.data, 'items'))).catch(() => {}), 200);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [isCommandPaletteOpen, query]);
 
   const navigationCommands = [
     { title: 'Overview — Intelligence Command Center', category: 'Navigation', icon: '📊', path: '/' },
@@ -32,7 +43,8 @@ export default function CommandPalette() {
     { title: 'Settings — API Keys & Thresholds', category: 'System', icon: '⚙️', path: '/settings' },
   ];
 
-  const caseCommands = (casesList || []).map(c => ({
+  const searchedCases = serverCases.length ? serverCases.map(item => ({ id: item.id, external_complaint_id: item.reference })) : casesList;
+  const caseCommands = (searchedCases || []).map(c => ({
     title: `Open Case: ${c.external_complaint_id} (${c.fraud_typology || 'Case'})`,
     subtitle: `Loss: ${c.reported_loss_amount?.toLocaleString()} ${c.loss_currency} • Risk: ${c.risk_tier}`,
     category: 'Cases',

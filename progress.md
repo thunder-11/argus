@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_8_complete_shadow_only`
-Last updated: 2026-09-13 Asia/Calcutta
-Current objective: Phase 8 is complete as a research/shadow-only prototype; Phase 9 can serve only a reviewed, promoted model.
+Overall status: `phase_12_code_complete_checks_deferred`
+Last updated: 2026-09-14 Asia/Calcutta
+Current objective: Phase 12 frontend contract integration is implemented; all requested verification is explicitly deferred.
 
 ## Phase Tracker
 
@@ -25,11 +25,11 @@ Current objective: Phase 8 is complete as a research/shadow-only prototype; Phas
 | 5 | Tracing and Temporal Transaction Graphs | complete | `dc317a3576f96a93ef14270d3f84dae5d2180850` | verified on `origin/sih26183/implementation` | Bounded evidence paths, immutable graph snapshots, report-event time partitions, side-effect-free graph queries, cursors, and visualization-only live trails are implemented. |
 | 6 | Attribution and Deterministic Analytics | complete | `a42dc1e` | verified on `origin/sih26183/implementation` | Reviewed point-in-time labels, conservative nearest-VASP attribution, privacy boundaries, cluster false-positive controls, qualified cross-victim correlation, and versioned rule evidence are implemented. |
 | 7 | Fresh ML Data and Feature Platform | complete | `d731932` | verified on `origin/sih26183/implementation` | Independent manifests, five-state labels, dual review, causal features, grouped chronological splits, privacy/poisoning controls, and non-reuse audit are implemented. |
-| 8 | Fresh ML Training, Validation, and Evaluation | complete_shadow_only | pending | pending | Fresh Elliptic++ BTC research baselines, chronological evaluation, calibration, artifact verification, and gates are implemented. Unstated source license and non-dual-reviewed labels prohibit promotion. |
-| 9 | ML Inference, Explainability, and Human Review | not_started | pending | pending | Decision support only, with analyst override. |
-| 10 | Real-Time Status, Monitoring, and Alerts | not_started | pending | pending | Durable status stream and alerts. |
-| 11 | Reports, Evidence, and Investigator Operations | not_started | pending | pending | Immutable reports and evidence manifests. |
-| 12 | Existing Frontend Integration | not_started | pending | pending | API integration only, no frontend redesign. |
+| 8 | Fresh ML Training, Validation, and Evaluation | complete_shadow_only | `505d972` | verified on `origin/sih26183/implementation` | Fresh Elliptic++ BTC research baselines, chronological evaluation, calibration, artifact verification, and gates are implemented. Unstated source license and non-dual-reviewed labels prohibit promotion. |
+| 9 | ML Inference, Explainability, and Human Review | complete | `3a4d2fc46a9f43b8d6d10fe59db42a57e50466bd` | verified on `origin/sih26183/implementation` | Hash-verified fresh-model serving, explicit abstention, evidence explanations, immutable reviews, and controlled lifecycle operations. |
+| 10 | Real-Time Status, Monitoring, and Alerts | complete | `f078ee0cc18f95076adc05b8b5daf29c4818e0d5` | verified on `origin/sih26183/implementation` | Durable status events, SSE replay, job controls, and deduplicated alert state. |
+| 11 | Reports, Evidence, and Investigator Operations | complete | `dcf510ca8d6b96c0007503f83e51dcae544b9a51` | verified on `origin/sih26183/implementation` | Immutable report revisions/manifests, scoped search/audit, settings, and reviewed notice operations. |
+| 12 | Existing Frontend Integration | implementation_complete_checks_deferred | pending | pending | API integration only, no frontend redesign; no Phase 12 checks were run at the user's direction. |
 | 13 | Operational Hardening and Release | not_started | pending | pending | Final regression, docs, deployment, and SIH demo readiness. |
 
 ## Baseline Findings
@@ -194,6 +194,19 @@ Recorded before implementation:
 | Implement lightweight baseline and evaluation | done | A balanced stochastic logistic baseline, validation threshold, disjoint sigmoid calibration, final-test metrics, bootstrap precision interval, quality gates, latency measure, model card, and hash replay verification are implemented. |
 | Enforce promotion restrictions | done | Every run is forced to `shadow` because the source license is unstated and labels are not locally dual-reviewed; failed PRD gates are retained in the experiment manifest. |
 | Validate Phase 8 | done | Focused Phase 7–8 tests and full backend regression pass; the transfer-risk real-data CLI run wrote and reloaded a hash-verified shadow artifact. The wallet adapter uses the same CLI path and is fixture-tested; full wallet execution is intentionally deferred on this memory-limited workstation. |
+
+## Phase 12 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Bind the API client and authentication lifecycle | done | The client reads `VITE_API_BASE_URL`, keeps session tokens in session storage, restores the authenticated user, refreshes a failed access token once, and clears case/session data on logout or terminal authorization failure. |
+| Bind case and graph context to server state | done | Case selection, graph reads, report-time temporal filters, boundary selection, and optional context use the implemented case and graph contracts; no demo case is selected before server data arrives. |
+| Make intake contract-driven | done | Wallet validation precedes a single idempotent complaint intake request, preserving receipt-time input and the server-managed initial analysis queue. Demo-only data is explicitly environment-gated. |
+| Replace fabricated investigation findings | done | Money trail, graph, wallet dossier, cross-chain, overview, analytics, entities, alerts, reports, status, settings, and command search render server responses or explicit loading, empty, unavailable, restricted, partial, error, and unknown states. |
+| Preserve routes and legacy page exports | done | Existing routes remain unchanged; legacy case, dashboard, and VASP page exports delegate to their integrated counterparts rather than retaining synthetic parallel interfaces. |
+| Add lightweight frontend contract helpers | done | Shared response normalization and error extraction isolate compatibility wrappers and prevent fabricated zero/default values; a focused contract test file is included for later execution. |
+| Verify Phase 12 | deferred_by_user | Per explicit instruction on 2026-09-14, no lint, build, unit/contract, backend, browser, API, or other Phase 12 checks were run or restarted. |
+| Finalize/push Phase 12 | pending | Commit and remote SHA will be recorded after the implementation commit is pushed. |
 
 ## Requirement Coverage Map
 
