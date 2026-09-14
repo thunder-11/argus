@@ -9,9 +9,9 @@ Commit author policy: use `Ali <alizamir9992@gmail.com>` from local Git config.
 
 ## Current Status
 
-Overall status: `phase_12_complete`
+Overall status: `phase_13_complete_with_external_blockers`
 Last updated: 2026-09-14 Asia/Calcutta
-Current objective: Phase 12 frontend contract integration and its deferred verification are complete.
+Current objective: Phase 13 operational hardening is implemented; production deployment validation remains blocked on external infrastructure, credentials, and approved ML data.
 
 ## Phase Tracker
 
@@ -30,7 +30,7 @@ Current objective: Phase 12 frontend contract integration and its deferred verif
 | 10 | Real-Time Status, Monitoring, and Alerts | complete | `f078ee0cc18f95076adc05b8b5daf29c4818e0d5` | verified on `origin/sih26183/implementation` | Durable status events, SSE replay, job controls, and deduplicated alert state. |
 | 11 | Reports, Evidence, and Investigator Operations | complete | `dcf510ca8d6b96c0007503f83e51dcae544b9a51` | verified on `origin/sih26183/implementation` | Immutable report revisions/manifests, scoped search/audit, settings, and reviewed notice operations. |
 | 12 | Existing Frontend Integration | complete | `72376b3` | verification record `3ba0fce` pushed | API integration only, no frontend redesign. Frontend contracts, lint, production build, backend regression, and non-mutating browser smoke pass. |
-| 13 | Operational Hardening and Release | not_started | pending | pending | Final regression, docs, deployment, and SIH demo readiness. |
+| 13 | Operational Hardening and Release | complete_with_external_blockers | pending | pending | Measured operational contracts, release artifacts, and verification are complete. Production drills require provisioned services, credentials, and approved data. |
 
 ## Baseline Findings
 
@@ -211,38 +211,51 @@ Recorded before implementation:
 | Verify non-mutating browser smoke | done | Against an isolated fixture backend with matching local CORS origin, fixture login, intake form, temporal graph controls/empty state, wallet-risk input state, and report-history empty state rendered successfully. State-changing intake/report generation was intentionally not invoked. |
 | Finalize/push Phase 12 | done | Implementation commit `72376b3` and verification record `3ba0fce` were pushed to `origin/sih26183/implementation`. |
 
+## Phase 13 Tasks
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| Add measured service health and telemetry | done | `/health/ready` now performs a database readiness probe; authenticated system status reports measured database, provider configuration, queue, graph-projection, and NEW-ML state. Admin metrics expose bounded current-process request/error/latency measurements without SLO claims or sensitive values. |
+| Add drift and retraining operational controls | done | Admin-only drift evaluation recording, monitoring history, and retraining requests are append-only/audited and explicitly prohibit automatic training or promotion. Drift values are framed as investigation signals, not proof of degraded model performance. |
+| Preserve ML rollback and safety boundaries | done | The existing version-pinned lifecycle rollback remains the only model rollback path; the runbook requires an approved compatible NEW package or explicit ML abstention. No legacy ML fallback, online training, or unreviewed-override labels were added. |
+| Add deployment and recovery artifacts | done | `Dockerfile`, staging-shaped `compose.yaml`, expanded environment example, and `OPERATIONS.md` document PostgreSQL/Redis deployment, controlled migrations, worker backlog operation, readiness, telemetry, backup/restore validation, graph/cache rebuild, incident handling, and release controls. |
+| Document fairness and adversarial operations | done | The operations runbook specifies permissible cohort review, insufficient-evidence handling, sensitive-data limits, and replayable adversarial scenarios without claiming universal resistance. |
+| Verify Phase 13 | done | Focused operational tests: 3 passed. Full backend regression: 76 passed, 1 credential-gated provider smoke skipped. Python compilation/OpenAPI passed with 78 paths; Alembic has head `20260913_0005`; `pip check` passed. Frontend lint/build passed with existing advisory warnings and the 568.81 kB chunk advisory. |
+| Validate production infrastructure and release drill | blocked_external | No provisioned PostgreSQL/Redis/worker/object-storage deployment, provider credentials, approved production CORS/secret material, or approved mature ML labels exist in this workspace. The runbook defines the required backup/restore, provider, queue, and promotion drills; no false production-readiness claim is made. |
+| Finalize/push Phase 13 | pending | Record the implementation and completion commits after push. |
+
 ## Requirement Coverage Map
 
 | PRD Area | Planned Phase(s) | Status |
 | --- | --- | --- |
 | Victim-reported wallet submission and validation | 3 | complete |
 | Multi-blockchain support | 4 | complete |
-| Real-time blockchain data retrieval | 4, 10 | in_progress |
+| Real-time blockchain data retrieval | 4, 10 | complete_with_credential_gated_live_smoke |
 | Transaction history and normalization | 4, 5 | complete |
 | Wallet/entity relationship analysis | 5, 6 | complete |
 | Transaction graph generation | 5 | complete |
 | Transaction Graph Post-Report Filtering | 5 | complete |
 | Cryptocurrency exchange/VASP identification | 6 | complete |
-| Fraud and suspicious-activity detection | 6, 9 | in_progress |
-| Risk scoring, confidence, and explainable indicators | 6, 9 | in_progress |
-| Investigation and case management | 3, 11 | in_progress |
-| Real-time analysis status/progress | 10 | not_started |
-| Alerts and notifications | 10 | not_started |
-| Reports and evidence | 11 | not_started |
-| Search, filtering, pagination, and history | 11, 12 | not_started |
-| Authentication, authorization, and security | 1, 3, 20-security coverage through all phases | in_progress |
+| Fraud and suspicious-activity detection | 6, 9 | complete_shadow_ml_only |
+| Risk scoring, confidence, and explainable indicators | 6, 9 | complete_shadow_ml_only |
+| Investigation and case management | 3, 11 | complete |
+| Real-time analysis status/progress | 10 | complete |
+| Alerts and notifications | 10 | complete |
+| Reports and evidence | 11 | complete |
+| Search, filtering, pagination, and history | 11, 12 | complete |
+| Authentication, authorization, and security | 1, 3, 20-security coverage through all phases | complete_with_production_drill_blocked |
 | Audit logs | 3, 11 | in_progress |
 | Database/data models | 2 | complete |
-| Caching | 2, 4, 10 | in_progress |
-| Background jobs/queues | 2, 10 | in_progress |
-| Error handling, retries, and API rate limits | 1, 4, 21-resilience coverage through all phases | in_progress |
-| Logging and monitoring | 1, 10, 13 | in_progress |
-| Testing requirements | all phases | in_progress |
-| API documentation | 1, 13 | in_progress |
-| Deployment/configuration requirements | 1, 13 | in_progress |
+| Caching | 2, 4, 10 | complete_with_deployment_validation_blocked |
+| Background jobs/queues | 2, 10 | complete_with_worker_deployment_blocked |
+| Error handling, retries, and API rate limits | 1, 4, 21-resilience coverage through all phases | complete |
+| Logging and monitoring | 1, 10, 13 | complete_with_external_telemetry_export_blocked |
+| Testing requirements | all phases | complete_with_external_release_drill_blocked |
+| API documentation | 1, 13 | complete |
+| Deployment/configuration requirements | 1, 13 | complete_with_infrastructure_drill_blocked |
 | New ML architecture from scratch | 7, 8, 9, 13 | in_progress |
-| ML monitoring, drift, retraining, rollback | 9, 13 | not_started |
-| Existing frontend API integration only | 1, 12 | in_progress |
+| ML monitoring, drift, retraining, rollback | 9, 13 | complete_with_mature_data_blocked |
+| Existing frontend API integration only | 1, 12 | complete |
 
 ## ML Non-Reuse Control
 
@@ -336,6 +349,9 @@ Rules to enforce during ML phases:
 | 2026-09-14 | `git commit -m "Implement SIH26183 Phase 12 frontend integration"`; `git push origin sih26183/implementation` | Created and pushed implementation commit `72376b3`. |
 | 2026-09-14 | `npm test`; `npm run lint`; `npm run build`; `python -m pytest -p no:cacheprovider --basetemp E:\\Ali\\Crypto\\.tmp\\phase12-regression -q` | Contract tests: 3 passed. Lint exited 0 with advisory component warnings. Production build completed 257 modules with a 568.81 kB chunk-size advisory. Backend regression: 73 passed, 1 credential-gated live-provider smoke skipped, 1 known TestClient deprecation warning. |
 | 2026-09-14 | Isolated local fixture browser smoke using matching backend CORS origin and preview origin | Fixture login, intake form, graph temporal controls/empty state, wallet-risk input state, and reports empty state rendered successfully. No state-changing intake or report-generation request was issued. |
+| 2026-09-14 | Re-read the Phase 13 plan, baseline, complete updated PRD, progress tracker, current application/configuration/health/ML lifecycle/persistence code, and deployment artifacts | Restricted work to operational hardening and release contracts; recorded external infrastructure, credential, and mature-data limits rather than simulating production readiness. |
+| 2026-09-14 | `python -m pytest -p no:cacheprovider tests/test_phase13_operations.py -q`; `python -m pytest -p no:cacheprovider --basetemp E:\\Ali\\Crypto\\.tmp\\phase13-regression -q` | Focused Phase 13 tests: 3 passed. Full backend regression: 76 passed, one explicit credential-gated provider smoke skipped, and one known TestClient deprecation warning. |
+| 2026-09-14 | `python -m compileall -q app`; isolated OpenAPI check; `python -m alembic heads`; `python -m pip check`; `npm run lint`; `npm run build` | Compilation and OpenAPI passed: version `1.13.0-phase13`, 78 paths, including system status and ML monitoring. Alembic remains at head `20260913_0005`; dependencies are consistent. Frontend lint/build passed with existing warnings and the 568.81 kB chunk advisory. |
 
 ## Phase Completion Log
 
@@ -355,3 +371,4 @@ Rules to enforce during ML phases:
 - 2026-09-13: Phase 10 completed. Case status now exposes durable job state, attempts, errors, next retry, event-stream location and poll guidance. Authorized clients can cancel/retry case jobs; immutable run-progress rows stream through SSE with Last-Event-ID replay and heartbeat framing. Alert creation is fingerprint-deduplicated and recipient state remains separate. Full regression passed. Implementation commit `f078ee0cc18f95076adc05b8b5daf29c4818e0d5` was pushed and verified on GitHub.
 - 2026-09-13: Phase 11 completed. Generated reports now create immutable report revisions and canonical evidence manifests with separate content/PDF digests, report-event cutoff metadata, source references, temporal separation, limitations, and audit events. Authorized report history/manifest/download/verification, scoped case/wallet/hash search, filtered admin audit logs, append-only nonsecret policy settings, and reviewed/simulated-only notice dispatch contracts are available. Automatic court-certification and unsupported notice-attribution claims were removed while compatibility entry points remain. Implementation commit `dcf510ca8d6b96c0007503f83e51dcae544b9a51` was pushed and verified on GitHub.
 - 2026-09-14: Phase 12 completed. Implementation commit `72376b3` integrates the existing frontend with implemented authentication, intake, case, graph, transaction, risk, entity, alert, report, status, settings, and search contracts while preserving routes and visual design. Three focused frontend contract tests, lint, a 257-module production build, and the 73-test backend regression passed; one provider live smoke remains credential-gated. A non-mutating browser smoke passed against isolated fixture services with matching CORS origins.
+- 2026-09-14: Phase 13 implementation is complete pending commit. It adds measured readiness/system telemetry, admin-scoped bounded metrics, audited drift/retraining controls that cannot automatically train or promote, and deployment/recovery/fairness/adversarial runbooks. Local verification passed; production backup/restore, worker/Redis/PostgreSQL, provider, and mature-data drills remain explicitly blocked by absent external infrastructure, credentials, and approvals.

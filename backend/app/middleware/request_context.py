@@ -9,6 +9,8 @@ import uuid
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
+from app.core.metrics import operational_metrics
+
 
 request_id_context: ContextVar[str | None] = ContextVar("request_id", default=None)
 correlation_id_context: ContextVar[str | None] = ContextVar("correlation_id", default=None)
@@ -43,6 +45,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 (perf_counter() - started) * 1000,
                 extra={"request_id": request_id, "correlation_id": correlation_id},
             )
+            operational_metrics.record_request(response.status_code, (perf_counter() - started) * 1000)
             return response
         finally:
             request_id_context.reset(request_token)
