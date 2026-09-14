@@ -29,7 +29,7 @@ Current objective: Phase 12 frontend contract integration and its deferred verif
 | 9 | ML Inference, Explainability, and Human Review | complete | `3a4d2fc46a9f43b8d6d10fe59db42a57e50466bd` | verified on `origin/sih26183/implementation` | Hash-verified fresh-model serving, explicit abstention, evidence explanations, immutable reviews, and controlled lifecycle operations. |
 | 10 | Real-Time Status, Monitoring, and Alerts | complete | `f078ee0cc18f95076adc05b8b5daf29c4818e0d5` | verified on `origin/sih26183/implementation` | Durable status events, SSE replay, job controls, and deduplicated alert state. |
 | 11 | Reports, Evidence, and Investigator Operations | complete | `dcf510ca8d6b96c0007503f83e51dcae544b9a51` | verified on `origin/sih26183/implementation` | Immutable report revisions/manifests, scoped search/audit, settings, and reviewed notice operations. |
-| 12 | Existing Frontend Integration | complete | `72376b3` | implementation pushed; completion record pending | API integration only, no frontend redesign. Frontend contracts, lint, production build, backend regression, and non-mutating browser smoke pass. |
+| 12 | Existing Frontend Integration | complete | `72376b3` | verification record `3ba0fce` pushed | API integration only, no frontend redesign. Frontend contracts, lint, production build, backend regression, and non-mutating browser smoke pass. |
 | 13 | Operational Hardening and Release | not_started | pending | pending | Final regression, docs, deployment, and SIH demo readiness. |
 
 ## Baseline Findings
@@ -209,7 +209,7 @@ Recorded before implementation:
 | Verify frontend production checks | done | `npm run lint` exited 0 with advisory existing/component warnings; `npm run build` completed 257 modules. The 568.81 kB main bundle remains above Vite's advisory 500 kB chunk threshold. |
 | Verify backend regression | done | `python -m pytest -p no:cacheprovider --basetemp E:\\Ali\\Crypto\\.tmp\\phase12-regression -q` passed 73 tests; one explicitly credential-gated live provider smoke was skipped; one known TestClient deprecation warning remains. |
 | Verify non-mutating browser smoke | done | Against an isolated fixture backend with matching local CORS origin, fixture login, intake form, temporal graph controls/empty state, wallet-risk input state, and report-history empty state rendered successfully. State-changing intake/report generation was intentionally not invoked. |
-| Finalize/push Phase 12 | pending | Implementation commit `72376b3` is pushed; update this record after the verification-progress commit is pushed. |
+| Finalize/push Phase 12 | done | Implementation commit `72376b3` and verification record `3ba0fce` were pushed to `origin/sih26183/implementation`. |
 
 ## Requirement Coverage Map
 
